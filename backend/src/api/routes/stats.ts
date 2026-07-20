@@ -1,6 +1,7 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { getStats, type DbClient } from '../../db/stats';
 import { StatsCache } from '../../utils/statsCache';
+import { AppError } from '../../errors';
 
 export function createStatsRouter(db: DbClient) {
   const router = Router();
@@ -9,13 +10,12 @@ export function createStatsRouter(db: DbClient) {
     computeStats: () => getStats(db)
   });
 
-  router.get('/stats', async (req, res) => {
+  router.get('/stats', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const stats = await cache.get();
       return res.status(200).json(stats);
     } catch (error) {
-      console.error('Failed to load stats', error);
-      return res.status(500).json({ error: 'Unable to load stats' });
+      next(new AppError('Unable to load stats', 500, 'STATS_LOAD_ERROR'));
     }
   });
 

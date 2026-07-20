@@ -1,9 +1,10 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import type { AddressInfo } from "net";
 import request from "supertest";
 import { createAgentsRouter } from "../src/api/routes/agents";
 import { AgentRecord, createAgentDb } from "../src/db/agents";
 import Database from "better-sqlite3";
+import { AppError } from "../src/errors";
 
 const codingAgent: AgentRecord = {
   id: "coding-1",
@@ -14,6 +15,20 @@ const codingAgent: AgentRecord = {
   reputationScore: 0,
   lastSeenAt: new Date().toISOString()
 };
+
+function testErrorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
+  if (err instanceof AppError) {
+    const body: Record<string, unknown> = {
+      error: { code: err.code, message: err.message },
+    };
+    if (err.details !== undefined) {
+      (body.error as Record<string, unknown>).details = err.details;
+    }
+    res.status(err.statusCode).json(body);
+    return;
+  }
+  res.status(500).json({ error: { code: "INTERNAL_ERROR", message: err.message } });
+}
 
 function createTestApp(initialAgents: AgentRecord[] = [], healthTimeoutMs = 500) {
   const rawDb = new Database(":memory:");
@@ -35,6 +50,7 @@ function createTestApp(initialAgents: AgentRecord[] = [], healthTimeoutMs = 500)
   const app = express();
   app.use(express.json());
   app.use("/api/agents", createAgentsRouter({ db, healthTimeoutMs }));
+  app.use(testErrorHandler);
   return app;
 }
 
@@ -74,7 +90,7 @@ describe("Agents API route", () => {
     const response = await request(createTestApp()).get("/api/agents/missing");
 
     expect(response.status).toBe(404);
-    expect(response.body).toEqual({ error: "Agent not found" });
+    expect(response.body).toEqual({ error: { code: "NOT_FOUND", message: "Agent not found" } });
   });
 
   it("returns healthy status and latency for a reachable agent endpoint", async () => {
@@ -121,6 +137,6 @@ describe("Agents API route", () => {
     const response = await request(createTestApp()).get("/api/agents/missing/health");
 
     expect(response.status).toBe(404);
-    expect(response.body).toEqual({ error: "Agent not found" });
+    expect(response.body).toEqual({ error: { code: "NOT_FOUND", message: "Agent not found" } });
   });
 });

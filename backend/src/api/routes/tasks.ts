@@ -1,9 +1,10 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import { getTaskDb, createTaskDb } from "../../db/tasks";
 import { decompose } from "../../coordinator";
 import type { Task } from "../../types/task";
+import { ValidationError, NotFoundError, AppError } from "../../errors";
 
 export const tasksRouter = Router();
 
@@ -21,11 +22,10 @@ const TaskListSchema = z.object({
   q: z.string().optional(),
 });
 
-// POST /api/tasks
-tasksRouter.post("/", (req: Request, res: Response): void => {
+tasksRouter.post("/", (req: Request, res: Response, next: NextFunction): void => {
   const parse = CreateTaskSchema.safeParse(req.body);
   if (!parse.success) {
-    res.status(400).json({ error: parse.error.flatten() });
+    next(new ValidationError("Invalid request body", parse.error.flatten()));
     return;
   }
 
@@ -50,12 +50,11 @@ tasksRouter.post("/", (req: Request, res: Response): void => {
   res.status(201).json({ taskId: task.id, dagPreview: dag, status: "queued" });
 });
 
-// GET /api/tasks
-tasksRouter.get("/", (req: Request, res: Response): void => {
+tasksRouter.get("/", (req: Request, res: Response, next: NextFunction): void => {
   const walletPublicKey = (req.headers["walletpublickey"] as string) ?? "";
   const parse = TaskListSchema.safeParse(req.query);
   if (!parse.success) {
-    res.status(400).json({ error: parse.error.flatten() });
+    next(new ValidationError("Invalid query parameters", parse.error.flatten()));
     return;
   }
 
@@ -70,27 +69,25 @@ tasksRouter.get("/", (req: Request, res: Response): void => {
   res.json({ tasks: tasks.map(t => ({ ...t, dag: JSON.parse(t.dagJson) })), total, page, pageSize });
 });
 
-// GET /api/tasks/:id
-tasksRouter.get("/:id", (req: Request, res: Response): void => {
+tasksRouter.get("/:id", (req: Request, res: Response, next: NextFunction): void => {
   const db = createTaskDb(getTaskDb());
   const task = db.findById(req.params.id);
   if (!task) {
-    res.status(404).json({ error: "Task not found" });
+    next(new NotFoundError("Task"));
     return;
   }
   res.json({ ...task, dag: JSON.parse(task.dagJson) });
 });
 
-// DELETE /api/tasks/:id
-tasksRouter.delete("/:id", (req: Request, res: Response): void => {
+tasksRouter.delete("/:id", (req: Request, res: Response, next: NextFunction): void => {
   const db = createTaskDb(getTaskDb());
   const task = db.findById(req.params.id);
   if (!task) {
-    res.status(404).json({ error: "Task not found" });
+    next(new NotFoundError("Task"));
     return;
   }
   if (task.status === "running") {
-    res.status(409).json({ error: "Cannot cancel a running task" });
+    next(new AppError("Cannot cancel a running task", 409, "CONFLICT"));
     return;
   }
   db.updateStatus(req.params.id, "cancelled");

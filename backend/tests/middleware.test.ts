@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 
 // ── rateLimit ─────────────────────────────────────────────────────────────────
 
-// Re-require between tests to get a fresh module with empty windows map
 function freshRateLimit() {
   jest.resetModules();
   return require('../src/api/middleware/rateLimit').rateLimitMiddleware as typeof import('../src/api/middleware/rateLimit').rateLimitMiddleware;
@@ -51,7 +50,6 @@ describe('rateLimitMiddleware', () => {
     for (let i = 0; i < 20; i++) {
       rateLimitMiddleware(makeReq('1.2.3.4'), makeRes() as unknown as Response, next as NextFunction);
     }
-    // different IP should still pass
     const next2 = jest.fn();
     rateLimitMiddleware(makeReq('5.6.7.8'), makeRes() as unknown as Response, next2 as NextFunction);
     expect(next2).toHaveBeenCalled();
@@ -66,7 +64,6 @@ describe('rateLimitMiddleware', () => {
       rateLimitMiddleware(req, makeRes() as unknown as Response, jest.fn() as NextFunction);
     }
 
-    // Advance past the 60s window
     jest.advanceTimersByTime(61_000);
 
     const next = jest.fn();
@@ -116,15 +113,17 @@ describe('authMiddleware', () => {
 
   it('returns 401 for invalid API key', () => {
     const authMiddleware = freshAuth('key-abc');
-    const res = makeRes();
-    authMiddleware(makeAuthReq('Bearer wrong-key'), res as unknown as Response, jest.fn() as NextFunction);
-    expect(res.status).toHaveBeenCalledWith(401);
+    const next = jest.fn();
+    authMiddleware(makeAuthReq('Bearer wrong-key'), makeRes() as unknown as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+    expect((next.mock.calls[0][0] as any).statusCode).toBe(401);
   });
 
   it('returns 401 when Authorization header is missing', () => {
     const authMiddleware = freshAuth('key-abc');
-    const res = makeRes();
-    authMiddleware(makeAuthReq(), res as unknown as Response, jest.fn() as NextFunction);
-    expect(res.status).toHaveBeenCalledWith(401);
+    const next = jest.fn();
+    authMiddleware(makeAuthReq(), makeRes() as unknown as Response, next as NextFunction);
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+    expect((next.mock.calls[0][0] as any).statusCode).toBe(401);
   });
 });

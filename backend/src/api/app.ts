@@ -25,6 +25,7 @@ import { requestLogger } from "./middleware/requestLogger";
 import { errorHandler } from "./middleware/errorHandler";
 import { createLogger } from "../utils/logger";
 import { createTaskDb, getTaskDb } from "../db/tasks";
+import { ValidationError, UnauthorizedError, NotFoundError, AppError } from "../errors";
 
 export interface AppOptions {
   /** Called to execute a single DAG node; defaults to HTTP dispatch */
@@ -37,12 +38,6 @@ export interface AppOptions {
   stream?: TaskStreamOptions;
 }
 
-/**
- * Attempt to load smart-contracts releasePayment at runtime via dynamic require.
- * Returns undefined when the module is unavailable (e.g. backend CI without
- * smart-contracts compiled). Using require() instead of a static import keeps
- * TypeScript's rootDir constraint intact.
- */
 function tryLoadStellarRelease(): StellarReleasePaymentFn | undefined {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -59,7 +54,6 @@ export function createApp(opts: AppOptions = {}): {
 } {
   const app = express();
   app.use(express.json());
-  // ── Global middleware ────────────────────────────────────────────────────────
   app.use(requestId);
   app.use(requestLogger);
 
@@ -67,124 +61,126 @@ export function createApp(opts: AppOptions = {}): {
   const releasePayment: PaymentReleaseFn =
     opts.releasePayment ?? createPaymentReleaseFn(tryLoadStellarRelease());
 
-  // ── Health routes ───────────────────────────────────────────────────────────
   app.use("/health", healthRouter);
-
-  // ── Agent routes ───────────────────────────────────────────────────────────
   app.use("/api/agents", agentsRouter);
 
-  // ── POST /api/tasks ────────────────────────────────────────────────────────
   app.post(
     "/api/tasks",
     authMiddleware,
     rateLimitMiddleware,
-    (req: Request, res: Response) => {
-      const { prompt, walletPublicKey, maxBudgetXLM } = req.body as {
-        prompt?: string;
-        walletPublicKey?: string;
-        maxBudgetXLM?: number;
-      };
+    (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { prompt, walletPublicKey, maxBudgetXLM } = req.body as {
+          prompt?: string;
+          walletPublicKey?: string;
+          maxBudgetXLM?: number;
+        };
 
-      if (!prompt || typeof prompt !== "string" || prompt.trim() === "") {
-        return res.status(400).json({ error: "prompt is required" });
-      }
+        if (!prompt || typeof prompt !== "string" || prompt.trim() === "") {
+          throw new ValidationError("prompt is required");
+        }
 
-      if (maxBudgetXLM !== undefined && maxBudgetXLM < 0.1) {
-        return res.status(400).json({ error: "maxBudgetXLM must be >= 0.1" });
-      }
+        if (maxBudgetXLM !== undefined && maxBudgetXLM < 0.1) {
+          throw new ValidationError("maxBudgetXLM must be >= 0.1");
+        }
 
-      const taskId = `task_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
-      const dag = decompose(taskId, prompt);
-      const now = new Date().toISOString();
-      const correlationId = res.locals.requestId;
+        const taskId = `task_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
+        const dag = decompose(taskId, prompt);
+        const now = new Date().toISOString();
+        const correlationId = res.locals.requestId;
 
-      createTask({
-        taskId,
-        prompt,
-        walletPublicKey:
-          walletPublicKey ??
-          (req.headers["walletpublickey"] as string | undefined) ??
-          "anonymous",
-        status: "queued",
-        dag,
-        createdAt: now,
-        updatedAt: now,
-        requestId: correlationId,
-      });
-
-      const log = createLogger({ requestId: correlationId, taskId });
-
-      // Run the DAG asynchronously — do not await
-      setImmediate(() => {
-        executeDAG(getTask(taskId)!, dispatch, releasePayment).catch((err) => {
-          log.error({ err }, "DAG execution error");
+        createTask({
+          taskId,
+          prompt,
+          walletPublicKey:
+            walletPublicKey ??
+            (req.headers["walletpublickey"] as string | undefined) ??
+            "anonymous",
+          status: "queued",
+          dag,
+          createdAt: now,
+          updatedAt: now,
+          requestId: correlationId,
         });
-      });
 
-      log.info({ dagNodeCount: dag.length }, "task created");
+        const log = createLogger({ requestId: correlationId, taskId });
 
-      return res
-        .status(201)
-        .json({ taskId, dagPreview: dag, status: "queued" });
+        setImmediate(() => {
+          executeDAG(getTask(taskId)!, dispatch, releasePayment).catch((err) => {
+            log.error({ err }, "DAG execution error");
+          });
+        });
+
+        log.info({ dagNodeCount: dag.length }, "task created");
+
+        return res
+          .status(201)
+          .json({ taskId, dagPreview: dag, status: "queued" });
+      } catch (err) {
+        next(err);
+      }
     },
   );
 
-  // ── GET /api/tasks ─────────────────────────────────────────────────────────
-  app.get("/api/tasks", authMiddleware, (req: Request, res: Response) => {
-    const walletPublicKey = req.headers["walletpublickey"] as
-      string | undefined;
-    if (!walletPublicKey)
-      return res.status(401).json({ error: "walletpublickey header required" });
-    const page = Math.max(1, parseInt((req.query.page as string) ?? "1", 10));
-    const pageSize = Math.min(
-      100,
-      Math.max(1, parseInt((req.query.pageSize as string) ?? "20", 10)),
-    );
-    const taskDb = createTaskDb(getTaskDb());
-    const status = req.query.status as string | undefined;
-    const q = req.query.q as string | undefined;
-    const sort = req.query.sort as
-      "createdAt:asc" | "createdAt:desc" | undefined;
-    const { tasks, total } = taskDb.list(walletPublicKey, page, pageSize, {
-      status,
-      q,
-      sort,
-    });
-    return res.json({ tasks, total, page, pageSize });
-  });
-
-  // ── GET /api/tasks/:id ─────────────────────────────────────────────────────
-  app.get("/api/tasks/:id", (req: Request, res: Response) => {
-    const task = getTask(req.params.id!);
-    if (!task) return res.status(404).json({ error: "Task not found" });
-    return res.json({ ...task, id: task.taskId, dag: task.dag });
-  });
-
-  // ── DELETE /api/tasks/:id ──────────────────────────────────────────────────
-  app.delete("/api/tasks/:id", (req: Request, res: Response) => {
-    const task = getTask(req.params.id!);
-    if (!task) return res.status(404).json({ error: "Task not found" });
-    if (task.status === "running") {
-      return res.status(409).json({ error: "Cannot cancel a running task" });
+  app.get("/api/tasks", authMiddleware, (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const walletPublicKey = req.headers["walletpublickey"] as string | undefined;
+      if (!walletPublicKey) {
+        throw new UnauthorizedError("walletpublickey header required");
+      }
+      const page = Math.max(1, parseInt((req.query.page as string) ?? "1", 10));
+      const pageSize = Math.min(
+        100,
+        Math.max(1, parseInt((req.query.pageSize as string) ?? "20", 10)),
+      );
+      const taskDb = createTaskDb(getTaskDb());
+      const status = req.query.status as string | undefined;
+      const q = req.query.q as string | undefined;
+      const sort = req.query.sort as
+        "createdAt:asc" | "createdAt:desc" | undefined;
+      const { tasks, total } = taskDb.list(walletPublicKey, page, pageSize, {
+        status,
+        q,
+        sort,
+      });
+      return res.json({ tasks, total, page, pageSize });
+    } catch (err) {
+      next(err);
     }
-    const taskDb = createTaskDb(getTaskDb());
-    taskDb.updateStatus(req.params.id!, "cancelled");
-    return res.json({ ...task, id: task.taskId, status: "cancelled" });
   });
 
-  // ── HTTP server ────────────────────────────────────────────────────────────
+  app.get("/api/tasks/:id", (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const task = getTask(req.params.id!);
+      if (!task) throw new NotFoundError("Task");
+      return res.json({ ...task, id: task.taskId, dag: task.dag });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.delete("/api/tasks/:id", (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const task = getTask(req.params.id!);
+      if (!task) throw new NotFoundError("Task");
+      if (task.status === "running") {
+        throw new AppError("Cannot cancel a running task", 409, "CONFLICT");
+      }
+      const taskDb = createTaskDb(getTaskDb());
+      taskDb.updateStatus(req.params.id!, "cancelled");
+      return res.json({ ...task, id: task.taskId, status: "cancelled" });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   const httpServer = createServer(app);
 
-  // ── Event persistence ──────────────────────────────────────────────────────
-  // Record every Coordinator event (with its EventBus-assigned per-task seq) so
-  // a (re)connecting client can replay history before live streaming begins —
-  // either the full history, or only events past a `?lastEventId` cursor.
   const eventStore = opts.eventStore ?? createEventStore();
   const stopRecording = eventBus.subscribeAll((event) =>
     eventStore.append(event),
   );
 
-  // ── WebSocket: /tasks/:id/stream ───────────────────────────────────────────
   const detachStream = attachTaskStream({
     httpServer,
     eventStore,
@@ -193,7 +189,6 @@ export function createApp(opts: AppOptions = {}): {
     ...opts.stream,
   });
 
-  // ── Error handler (must be last) ───────────────────────────────────────────
   app.use(errorHandler);
 
   function close(): void {
@@ -211,7 +206,9 @@ async function defaultDispatch(
   node: { nodeId: string; agentType: string; prompt: string },
   context: string,
 ): Promise<unknown> {
-  // In production this POSTs to the agent's HTTP endpoint.
-  // The e2e test replaces this via opts.dispatch.
-  throw new Error(`No agent registered for type: ${node.agentType}`);
+  throw new AppError(
+    `No agent registered for type: ${node.agentType}`,
+    500,
+    "AGENT_NOT_FOUND",
+  );
 }
