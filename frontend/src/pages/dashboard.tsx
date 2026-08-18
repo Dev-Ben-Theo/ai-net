@@ -6,11 +6,13 @@ import { DashboardLayout } from '../components/dashboard/DashboardLayout';
 import { KpiCard } from '../components/dashboard/KpiCard';
 import { NetworkHealthBadge } from '../components/dashboard/NetworkHealthBadge';
 import { RecentTasksTable } from '../components/dashboard/RecentTasksTable';
+import { useToast } from '../hooks/useToast';
 import styles from './dashboard.module.css';
 
 export const DashboardPage: React.FC = () => {
   const { address } = useWallet();
-  const { data, loading } = useNetworkStats();
+  const { data, loading, error } = useNetworkStats();
+  const { showToast } = useToast();
 
   // Redirect unauthenticated users
   React.useEffect(() => {
@@ -18,6 +20,12 @@ export const DashboardPage: React.FC = () => {
       window.location.replace('/');
     }
   }, [address]);
+
+  React.useEffect(() => {
+    if (error) {
+      showToast(error.message || 'Unable to load dashboard data.', 'error');
+    }
+  }, [error, showToast]);
 
   if (!address) return null; // render nothing while redirecting
 

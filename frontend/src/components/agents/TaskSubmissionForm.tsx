@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { DAGPreview } from './DAGPreview';
 import { useTaskSubmit } from '../../hooks/useTaskSubmit';
+import { useToast } from '../../hooks/useToast';
 import type { AgentPreference, TaskSubmitResponse } from '../../services/taskService';
 
 const agentPreferences = [
@@ -33,9 +34,9 @@ type TaskFormValues = z.infer<typeof taskSchema>;
 
 export function TaskSubmissionForm() {
   const navigate = useNavigate();
-  const [toast, setToast] = useState<string | null>(null);
+  const { showToast } = useToast();
   const [preview, setPreview] = useState<TaskSubmitResponse['dagPreview'] | null>(null);
-  const { submitTask, status, error, data } = useTaskSubmit();
+  const { submitTask, status, data } = useTaskSubmit();
 
   const {
     register,
@@ -55,14 +56,13 @@ export function TaskSubmissionForm() {
     try {
       const result = await submitTask(values);
       setPreview(result.dagPreview);
-      setToast(null);
 
       window.setTimeout(() => {
         navigate(`/tasks/${result.taskId}`);
       }, 300);
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : 'Unable to submit task';
-      setToast(message);
+      showToast(message, 'error');
     }
   };
 
@@ -207,54 +207,6 @@ export function TaskSubmissionForm() {
         {!isLoading && <DAGPreview dagPreview={previewData ?? undefined} />}
       </section>
 
-      {toast && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          style={{
-            position: 'fixed',
-            right: 24,
-            bottom: 24,
-            maxWidth: 360,
-            padding: 16,
-            background: '#fef2f2',
-            border: '1px solid #fca5a5',
-            borderRadius: 12,
-            boxShadow: '0 12px 40px rgba(15, 23, 42, 0.15)',
-          }}
-        >
-          <div style={{ color: '#991b1b', marginBottom: 12 }}>{toast}</div>
-          <button
-            type="button"
-            onClick={() => setToast(null)}
-            style={{
-              padding: '8px 14px',
-              borderRadius: 8,
-              border: 'none',
-              background: '#ef4444',
-              color: '#ffffff',
-              cursor: 'pointer',
-            }}
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {error && !toast && (
-        <div
-          role="status"
-          style={{
-            marginTop: 24,
-            padding: 16,
-            borderRadius: 12,
-            background: '#f8d7da',
-            color: '#842029',
-          }}
-        >
-          {error}
-        </div>
-      )}
     </main>
   );
 }
