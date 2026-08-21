@@ -1,80 +1,55 @@
-import { useState, useCallback } from 'react'
-import { Keypair, TransactionBuilder, Operation, Asset, BASE_FEE, Networks, Memo, Horizon, Transaction } from '@stellar/stellar-sdk'
+import { useState, useMemo } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { TransactionBuilder, Operation, Asset, BASE_FEE, Networks, Memo, Horizon, Transaction } from '@stellar/stellar-sdk'
 import { useWallet } from '../../context/WalletContext'
 import { useWalletBalance } from '../../hooks/useWalletBalance'
 import { signTransactionWithFreighter } from '../../services/freighter'
+import { walletTransferSchema, type WalletTransferValues } from '../../schemas/wallet'
+import { FormField } from '../common/FormField'
 import styles from './SendXLMForm.module.css'
 
 const HORIZON_URL = 'https://horizon-testnet.stellar.org'
-
-function isValidStellarAddress(address: string): boolean {
-  try {
-    Keypair.fromPublicKey(address)
-    return true
-  } catch {
-    return false
-  }
-}
-
-interface ConfirmationData {
-  destination: string
-  amount: string
-  memo: string
-}
 
 export function SendXLMForm() {
   const { publicKey, keypair, connected, connectionMethod } = useWallet()
   const { balance } = useWalletBalance(publicKey)
 
-  const [destination, setDestination] = useState('')
-  const [amount, setAmount] = useState('')
-  const [memo, setMemo] = useState('')
-  const [errors, setErrors] = useState<{ destination?: string; amount?: string }>({})
-  const [confirmation, setConfirmation] = useState<ConfirmationData | null>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const [confirmation, setConfirmation] = useState<WalletTransferValues | null>(null)
   const [successTx, setSuccessTx] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
-  const validateField = useCallback(
-    (field: 'destination' | 'amount'): string | undefined => {
-      if (field === 'destination') {
-        if (!destination.trim()) return 'Destination address is required'
-        if (!isValidStellarAddress(destination.trim()))
-          return 'Invalid Stellar address. Must start with G and be 56 characters.'
-        return undefined
-      }
-      if (field === 'amount') {
-        if (!amount.trim()) return 'Amount is required'
-        const parsed = parseFloat(amount)
-        if (isNaN(parsed) || parsed <= 0) return 'Amount must be a positive number'
-        const availableBalance = parseFloat(balance)
-        if (parsed > availableBalance) return 'Insufficient balance'
-        return undefined
-      }
-      return undefined
+  const schemaWithBalance = useMemo(() => {
+    return walletTransferSchema.extend({
+      amount: walletTransferSchema.shape.amount.refine(
+        (val) => val <= parseFloat(balance),
+        'Insufficient balance'
+      )
+    })
+  }, [balance])
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, touchedFields, isValid },
+  } = useForm<WalletTransferValues>({
+    mode: 'onBlur',
+    resolver: zodResolver(schemaWithBalance),
+    defaultValues: {
+      destination: '',
+      amount: undefined,
+      memo: '',
     },
-    [destination, amount, balance]
-  )
+  })
 
-  const handleDestinationBlur = () => {
-    const err = validateField('destination')
-    setErrors((prev) => ({ ...prev, destination: err }))
-  }
-
-  const handleAmountBlur = () => {
-    const err = validateField('amount')
-    setErrors((prev) => ({ ...prev, amount: err }))
-  }
-
-  const handleSendClick = () => {
-    const destErr = validateField('destination')
-    const amtErr = validateField('amount')
-    const newErrors = { destination: destErr, amount: amtErr }
-    setErrors(newErrors)
-
-    if (!destErr && !amtErr) {
-      setConfirmation({ destination: destination.trim(), amount: amount.trim(), memo: memo.trim() })
-    }
+  const handleSendClick = (data: WalletTransferValues) => {
+    setConfirmation({
+      destination: data.destination.trim(),
+      amount: data.amount,
+      memo: data.memo?.trim() || '',
+    })
   }
 
   const buildTransaction = async (): Promise<Transaction> => {
@@ -84,14 +59,13 @@ export function SendXLMForm() {
     let txBuilder = new TransactionBuilder(account, {
       fee: BASE_FEE,
       networkPassphrase: Networks.TESTNET,
-    })
-      .addOperation(
-        Operation.payment({
-          destination: confirmation!.destination,
-          asset: Asset.native(),
-          amount: confirmation!.amount,
-        })
-      )
+    }).addOperation(
+      Operation.payment({
+        destination: confirmation!.destination,
+        asset: Asset.native(),
+        amount: confirmation!.amount.toString(),
+      })
+    )
 
     if (confirmation!.memo) {
       const memoText = confirmation!.memo
@@ -114,8 +88,8 @@ export function SendXLMForm() {
       if (!keypair) return
     }
 
-    setSubmitting(true)
     setSubmitError(null)
+    setSubmitting(true)
 
     try {
       const transaction = await buildTransaction()
@@ -146,11 +120,8 @@ export function SendXLMForm() {
 
       const txHash = submitData.hash
       setSuccessTx(txHash)
-      setDestination('')
-      setAmount('')
-      setMemo('')
+      reset()
       setConfirmation(null)
-      setErrors({})
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to send payment'
       setSubmitError(message)
@@ -175,80 +146,57 @@ export function SendXLMForm() {
     <div className={styles.container}>
       <h3 className={styles.heading}>Send XLM</h3>
 
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor="send-destination">
-          Destination address
-        </label>
-        <input
+      <form onSubmit={handleSubmit(handleSendClick)} noValidate>
+        <FormField
+          label="Destination address"
           id="send-destination"
-          className={`${styles.input} ${errors.destination ? styles.inputError : ''}`}
-          type="text"
           placeholder="GABCD...1234"
-          value={destination}
-          onChange={(e) => setDestination(e.target.value)}
-          onBlur={handleDestinationBlur}
-          aria-invalid={Boolean(errors.destination)}
-          aria-describedby="dest-error"
-          disabled={Boolean(successTx)}
+          error={errors.destination?.message}
+          isTouched={touchedFields.destination}
+          disabled={Boolean(successTx) || submitting}
+          className={styles.field}
+          {...register('destination')}
         />
-        {errors.destination && (
-          <p id="dest-error" className={styles.error} role="alert">
-            {errors.destination}
-          </p>
-        )}
-      </div>
 
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor="send-amount">
-          Amount (XLM)
-        </label>
-        <input
-          id="send-amount"
-          className={`${styles.input} ${errors.amount ? styles.inputError : ''}`}
+        <FormField
+          label="Amount (XLM)"
           type="number"
+          id="send-amount"
           step="0.0000001"
           min="0"
           placeholder="0.0"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          onBlur={handleAmountBlur}
-          aria-invalid={Boolean(errors.amount)}
-          aria-describedby="amount-error"
-          disabled={Boolean(successTx)}
+          error={errors.amount?.message}
+          isTouched={touchedFields.amount}
+          helperText={`Available balance: ${parseFloat(balance).toFixed(7)} XLM`}
+          disabled={Boolean(successTx) || submitting}
+          className={styles.field}
+          {...register('amount')}
         />
-        <p className={styles.helper}>
-          Available balance: {parseFloat(balance).toFixed(7)} XLM
-        </p>
-        {errors.amount && (
-          <p id="amount-error" className={styles.error} role="alert">
-            {errors.amount}
-          </p>
-        )}
-      </div>
 
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor="send-memo">
-          Memo (optional)
-        </label>
-        <input
+        <FormField
+          label="Memo (optional)"
           id="send-memo"
-          className={styles.input}
-          type="text"
           placeholder="Payment memo (max 28 chars)"
           maxLength={28}
-          value={memo}
-          onChange={(e) => setMemo(e.target.value)}
-          disabled={Boolean(successTx)}
+          error={errors.memo?.message}
+          isTouched={touchedFields.memo}
+          disabled={Boolean(successTx) || submitting}
+          className={styles.field}
+          {...register('memo')}
         />
-      </div>
 
-      <button
-        className={styles.sendButton}
-        onClick={handleSendClick}
-        disabled={submitting || Boolean(successTx)}
-      >
-        {submitting ? 'Sending...' : 'Send'}
-      </button>
+        <button
+          type="submit"
+          className={styles.sendButton}
+          disabled={submitting || Boolean(successTx) || !isValid}
+          style={{
+            background: (!isValid || submitting) ? '#9ca3af' : undefined,
+            cursor: (!isValid || submitting) ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {submitting ? 'Sending...' : 'Send'}
+        </button>
+      </form>
 
       {submitError && (
         <p className={styles.error} role="alert" style={{ marginTop: 12 }}>
