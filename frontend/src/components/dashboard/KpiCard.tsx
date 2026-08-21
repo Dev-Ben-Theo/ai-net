@@ -13,7 +13,7 @@ interface KpiCardProps {
 export const KpiCard: React.FC<KpiCardProps> = ({ title, value, sparklineData, loading }) => {
   const data = sparklineData.map((v, i) => ({ x: i, y: v }));
   return (
-    <div className={styles.card}>
+    <div className={`${styles.card} hover-lift`}>
       {loading ? (
         <div className={styles.skeleton} />
       ) : (
