@@ -114,3 +114,7 @@ export const getRecentTasks = async (walletAddress: string): Promise<TaskRespons
 export const getAgents = async (): Promise<AgentRecord[]> => {
   return apiClient.get<AgentRecord[]>('/api/agents');
 };
+
+export const getAgentReputation = async (id: string): Promise<import('../types/agent').AgentReputation> => {
+  return apiClient.get<import('../types/agent').AgentReputation>(`/api/agents/${id}/reputation`);
+};

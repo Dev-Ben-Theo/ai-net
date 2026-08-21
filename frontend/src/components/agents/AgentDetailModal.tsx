@@ -2,6 +2,9 @@ import { useEffect } from 'react'
 import { ExternalLink, X } from 'lucide-react'
 import type { AgentRecord } from '../../types/api'
 import { ReputationStars } from './ReputationStars'
+import { useAgentReputation } from '../../hooks/useAgentReputation'
+import { AgentReputationRadar } from './AgentReputationRadar'
+import { AgentReputationTrend } from './AgentReputationTrend'
 import styles from './AgentDetailModal.module.css'
 
 const STELLAR_EXPLORER = 'https://stellar.expert/explorer/testnet'
@@ -12,6 +15,8 @@ interface AgentDetailModalProps {
 }
 
 export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
+  const { data: reputationData, loading: reputationLoading } = useAgentReputation(agent?.id || '')
+
   useEffect(() => {
     if (!agent) return
     const onKey = (e: KeyboardEvent) => {
@@ -117,6 +122,22 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
                 </a>
               ) : (
                 <span className={styles.value}>Not available</span>
+              )}
+            </dd>
+          </div>
+
+          <div className={styles.fieldWide}>
+            <dt>Reputation Details</dt>
+            <dd>
+              {reputationLoading ? (
+                <div>Loading charts...</div>
+              ) : reputationData ? (
+                <div className={styles.chartsContainer}>
+                  <AgentReputationRadar dimensions={reputationData.dimensions} />
+                  <AgentReputationTrend history={reputationData.history} />
+                </div>
+              ) : (
+                <div>No detailed reputation data available</div>
               )}
             </dd>
           </div>
