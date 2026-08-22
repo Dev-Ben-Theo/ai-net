@@ -1,5 +1,5 @@
 import React from 'react'
-import { LayoutDashboard, PlusCircle, Bot, Wallet } from 'lucide-react'
+import { NAV_ITEMS } from './MobileDrawer'
 import './Sidebar.css'
 
 interface SidebarProps {
@@ -13,12 +13,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentPath, 
   onNavigate 
 }) => {
-  const navItems = [
-    { path: '/', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
-    { path: '/tasks/new', icon: <PlusCircle size={18} />, label: 'New Task' },
-    { path: '/agents', icon: <Bot size={18} />, label: 'Agents' },
-    { path: '/wallet', icon: <Wallet size={18} />, label: 'Wallet' },
-  ]
+  const navItems = NAV_ITEMS.map((item) => ({
+    ...item,
+    icon: <item.icon size={18} />,
+  }))
 
   const handleKeyDown = (e: React.KeyboardEvent, path: string) => {
     if (e.key === 'Enter' || e.key === ' ') {

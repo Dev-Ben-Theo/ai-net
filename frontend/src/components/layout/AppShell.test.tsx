@@ -170,12 +170,12 @@ describe('Mobile drawer keyboard', () => {
     await act(async () => { fireEvent.click(hamburger) })
 
     // Drawer should be open
-    expect(screen.getByRole('navigation', { name: /mobile navigation/i })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /mobile navigation/i })).toBeInTheDocument()
 
     await act(async () => {
       fireEvent.keyDown(document, { key: 'Escape' })
     })
 
-    expect(screen.queryByRole('navigation', { name: /mobile navigation/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: /mobile navigation/i })).not.toBeInTheDocument()
   })
 })
