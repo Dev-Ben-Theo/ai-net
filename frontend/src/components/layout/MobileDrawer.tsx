@@ -21,7 +21,7 @@ const FOCUSABLE_SELECTOR =
 
 const MobileDrawer = forwardRef<HTMLDivElement, MobileDrawerProps>(
   ({ onClose, currentPath, onNavigate }, ref) => {
-    const drawerRef = useRef<HTMLDivElement>(null)
+    const drawerRef = useRef<HTMLDivElement | null>(null)
     const previousFocusRef = useRef<HTMLElement | null>(null)
     const combinedRef = useCallback(
       (node: HTMLDivElement | null) => {
