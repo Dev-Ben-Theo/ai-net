@@ -150,3 +150,47 @@ pub struct ErrorResolvedEvent {
     /// How the error was closed: `Fixed`, `Ignored`, or `Escalated`.
     pub resolution_code: u32,
 }
+
+/// Data payload for `(registry, att_created)`.
+///
+/// Published when a new capability attestation is successfully created via
+/// `attest_capability`. Includes the expiry timestamp so indexers can schedule
+/// automatic expiry events without polling.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct AttestationCreatedEvent {
+    /// The agent this attestation is for.
+    pub agent_id: Symbol,
+    /// The capability being attested.
+    pub capability: Symbol,
+    /// Address of the signer who produced the attestation.
+    pub signer: Address,
+    /// Ledger timestamp when the attestation expires.
+    pub expires_at: u64,
+}
+
+/// Data payload for `(registry, att_revoked)`.
+///
+/// Published when an agent owner revokes their own attestation via
+/// `revoke_attestation`.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct AttestationRevokedEvent {
+    /// The agent whose attestation was revoked.
+    pub agent_id: Symbol,
+    /// The capability that was attested.
+    pub capability: Symbol,
+}
+
+/// Data payload for `(registry, att_expired)`.
+///
+/// Published by `verify_attestation` when it detects an expired attestation.
+/// Off-chain indexers can subscribe to this to track expiry events.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct AttestationExpiredEvent {
+    /// The agent whose attestation expired.
+    pub agent_id: Symbol,
+    /// The capability that was attested.
+    pub capability: Symbol,
+}

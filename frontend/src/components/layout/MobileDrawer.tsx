@@ -1,11 +1,13 @@
 import React, { forwardRef, useEffect, useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion, PanInfo } from 'framer-motion'
-import { LayoutDashboard, PlusCircle, Bot, Wallet } from 'lucide-react'
+import { LayoutDashboard, PlusCircle, Bot, Wallet, History } from 'lucide-react'
 import './MobileDrawer.css'
 
 export const NAV_ITEMS = [
   { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/tasks/new', icon: PlusCircle, label: 'New Task' },
+  { path: '/tasks/history', icon: History, label: 'Task History' },
   { path: '/agents', icon: Bot, label: 'Agents' },
   { path: '/wallet', icon: Wallet, label: 'Wallet' },
 ] as const
@@ -21,6 +23,7 @@ const FOCUSABLE_SELECTOR =
 
 const MobileDrawer = forwardRef<HTMLDivElement, MobileDrawerProps>(
   ({ onClose, currentPath, onNavigate }, ref) => {
+    const { t } = useTranslation()
     const drawerRef = useRef<HTMLDivElement | null>(null)
     const previousFocusRef = useRef<HTMLElement | null>(null)
     const combinedRef = useCallback(
@@ -108,15 +111,15 @@ const MobileDrawer = forwardRef<HTMLDivElement, MobileDrawerProps>(
           onDragEnd={handleDragEnd}
           role="dialog"
           aria-modal="true"
-          aria-label="Mobile navigation menu"
+          aria-label={t('a11y.mobileNavigationMenu')}
         >
           <div className="drawer-drag-handle" aria-hidden="true" />
           <div className="drawer-header">
-            <h2>Navigation</h2>
+            <h2>{t('nav.navigation')}</h2>
             <button
               className="close-btn"
               onClick={onClose}
-              aria-label="Close navigation menu"
+              aria-label={t('a11y.closeNavigationMenu')}
             >
               ✕
             </button>

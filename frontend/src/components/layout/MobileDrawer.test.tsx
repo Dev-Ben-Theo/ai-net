@@ -1,6 +1,6 @@
 import React from 'react'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, test, expect, beforeEach, vi } from 'vitest'
 import MobileDrawer, { NAV_ITEMS } from './MobileDrawer'
 
@@ -197,8 +197,8 @@ describe('MobileDrawer focus trap', () => {
 // ─── NAV_ITEMS export ──────────────────────────────────────────────────────
 
 describe('NAV_ITEMS', () => {
-  test('exports 4 navigation items', () => {
-    expect(NAV_ITEMS).toHaveLength(4)
+  test('exports 5 navigation items', () => {
+    expect(NAV_ITEMS).toHaveLength(5)
   })
 
   test('each item has path, icon, and label', () => {
