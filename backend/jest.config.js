@@ -4,6 +4,11 @@ module.exports = {
   roots: ['<rootDir>/tests', '<rootDir>/src'],
   testMatch: ['**/?(*.)+(spec|test).[tj]s'],
   testTimeout: 130_000,
+  // Register a process 'exit' handler to close better-sqlite3 handles before
+  // the V8 isolate is torn down. Prevents SIGABRT / exit-134 on Node 24 when
+  // fake-timers in shutdown.test.ts interact with the native addon GC.
+  setupFilesAfterEnv: ['<rootDir>/tests/jestSetup.ts'],
+  globalTeardown: '<rootDir>/tests/global-teardown.ts',
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: {

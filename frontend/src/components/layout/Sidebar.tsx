@@ -1,5 +1,6 @@
 import React from 'react'
-import { NAV_ITEMS } from './MobileDrawer'
+import { useTranslation } from 'react-i18next'
+import { LayoutDashboard, PlusCircle, Bot, Wallet, History } from 'lucide-react'
 import './Sidebar.css'
 
 interface SidebarProps {
@@ -13,10 +14,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentPath, 
   onNavigate 
 }) => {
-  const navItems = NAV_ITEMS.map((item) => ({
-    ...item,
-    icon: <item.icon size={18} />,
-  }))
+  const { t } = useTranslation()
+
+  const navItems = [
+    { path: '/', icon: <LayoutDashboard size={18} />, label: t('nav.dashboard') },
+    { path: '/tasks/new', icon: <PlusCircle size={18} />, label: t('nav.newTask') },
+    { path: '/tasks/history', icon: <History size={18} />, label: t('nav.taskHistory') },
+    { path: '/agents', icon: <Bot size={18} />, label: t('nav.agents') },
+    { path: '/wallet', icon: <Wallet size={18} />, label: t('nav.wallet') },
+  ]
 
   const handleKeyDown = (e: React.KeyboardEvent, path: string) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -29,7 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     <aside 
       className={`sidebar ${collapsed ? 'collapsed' : ''}`}
     >
-      <nav className="sidebar-nav" role="navigation" aria-label="Main navigation">
+      <nav className="sidebar-nav" role="navigation" aria-label={t('a11y.mainNavigation')}>
         <ul>
           {navItems.map((item) => {
             const isActive = currentPath === item.path
