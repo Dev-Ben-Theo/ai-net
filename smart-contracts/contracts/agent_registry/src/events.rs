@@ -32,7 +32,7 @@
 //! | `unfreeze_agent`    | `unfreeze`         | `agent_id`                                               |
 //! | `update_pricing`    | `price_upd`        | `(agent_id, new_price)`                                  |
 
-use soroban_sdk::{contracttype, Address, BytesN, Symbol};
+use soroban_sdk::{contracttype, Address, BytesN, Symbol, String};
 
 // ─── Legacy structs (kept for ABI compatibility) ──────────────────────────────
 
@@ -44,6 +44,29 @@ pub struct AgentRegistered {
     pub agent_type: Symbol,
     pub owner: Address,
     pub timestamp: u64,
+}
+
+// ─── Upgrade-related events ──────────────────────────────────────────────────
+
+/// Emitted when contract is successfully upgraded
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct ContractUpgradedEvent {
+    pub old_version: String,
+    pub new_version: String,
+    pub wasm_hash: BytesN<32>,
+    pub admin: Address,
+    pub upgrade_ledger: u32,
+}
+
+/// Emitted when contract is rolled back to previous version
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct ContractRolledBackEvent {
+    pub reverted_version: String,
+    pub restored_version: String,
+    pub admin: Address,
+    pub rollback_ledger: u32,
 }
 
 /// Emitted by legacy status-change paths; superseded by freeze/unfreeze events.

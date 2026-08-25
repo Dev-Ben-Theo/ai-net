@@ -33,6 +33,12 @@
 //! all-success means the batch committed; any failure means **no** writes occurred.
 
 mod events;
+mod upgrade;
+
+#[cfg(test)]
+mod upgrade_tests;
+
+pub use upgrade::*;
 
 use events::{
     AdminChangedEvent, AgentDeregisteredEvent, AgentRegisteredEvent, ErrorReportedEvent,
