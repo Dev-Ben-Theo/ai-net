@@ -199,6 +199,7 @@ pub enum DataKey {
     /// Ledger number at which the cooldown expires for a deregistering agent.
     /// Key present ⟺ the agent is in the cooldown window.
     BondCooldown(Symbol),
+    Attestation(Symbol),
 }
 
 /// Per-item outcome for batch registration (`Ok(agent_id)` / `Err(code)`).
@@ -240,6 +241,8 @@ pub enum Error {
     InsufficientBond = 10,
     /// Bond return attempted before the 24-hour cooldown has elapsed.
     CooldownNotElapsed = 11,
+    /// Attestation has already been revoked.
+    AttestationRevoked = 12,
 }
 
 impl From<Error> for soroban_sdk::Error {
@@ -262,6 +265,7 @@ impl From<soroban_sdk::Error> for Error {
             9 => Error::InvalidRecord,
             10 => Error::InsufficientBond,
             11 => Error::CooldownNotElapsed,
+            12 => Error::AttestationRevoked,
             _ => Error::NotFound,
         }
     }
@@ -284,6 +288,7 @@ impl Error {
             9 => Some(Error::InvalidRecord),
             10 => Some(Error::InsufficientBond),
             11 => Some(Error::CooldownNotElapsed),
+            12 => Some(Error::AttestationRevoked),
             _ => None,
         }
     }
@@ -1220,7 +1225,6 @@ mod test {
     extern crate std;
 
     use super::*;
-    use ed25519_dalek::Signer;
     use soroban_sdk::xdr::ToXdr;
     use soroban_sdk::{
         testutils::Address as _, testutils::Events as _, testutils::Ledger as _, BytesN, Env,
