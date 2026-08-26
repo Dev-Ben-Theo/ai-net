@@ -41,11 +41,11 @@ use events::{
     AttestationExpiredEvent, AttestationRevokedEvent, ErrorReportedEvent, ErrorResolvedEvent,
     RegistryInitializedEvent,
 };
-pub use types::Attestation;
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, xdr::ToXdr, Address, BytesN, Env, Map,
     String, Symbol, Val, Vec,
 };
+pub use types::Attestation;
 
 #[allow(dead_code)]
 const MAX_AGENT_ID: u32 = 64;
@@ -935,9 +935,7 @@ impl AgentRegistryContract {
         };
 
         let att_key = DataKey::Attestation(agent_id.clone());
-        env.storage()
-            .persistent()
-            .set(&att_key, &attestation);
+        env.storage().persistent().set(&att_key, &attestation);
         extend_ttl_for_key(&env, &att_key);
 
         env.events().publish(
@@ -1001,9 +999,7 @@ impl AgentRegistryContract {
         attestation.signer.require_auth();
 
         attestation.revoked = true;
-        env.storage()
-            .persistent()
-            .set(&att_key, &attestation);
+        env.storage().persistent().set(&att_key, &attestation);
         extend_ttl_for_key(&env, &att_key);
 
         env.events().publish(
@@ -1034,7 +1030,10 @@ mod test {
     use super::*;
     use ed25519_dalek::Signer;
     use soroban_sdk::xdr::ToXdr;
-    use soroban_sdk::{testutils::Address as _, testutils::Events as _, testutils::Ledger as _, BytesN, Env, FromVal};
+    use soroban_sdk::{
+        testutils::Address as _, testutils::Events as _, testutils::Ledger as _, BytesN, Env,
+        FromVal,
+    };
 
     /// Creates a fresh in-memory test environment with the contract registered.
     ///
@@ -2165,7 +2164,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att1"), &Symbol::new(&env, "research"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att1"),
+            &Symbol::new(&env, "research"),
+        );
 
         let att = client.attest_capability(
             &Symbol::new(&env, "att1"),
@@ -2191,7 +2195,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att_q"), &Symbol::new(&env, "coding"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att_q"),
+            &Symbol::new(&env, "coding"),
+        );
 
         client.attest_capability(
             &Symbol::new(&env, "att_q"),
@@ -2218,7 +2227,12 @@ mod test {
         let sk1 = make_signing_key();
         let pk1 = pubkey_bytes(&env, &sk1);
         let signer1 = Address::generate(&env);
-        let sig1 = sign_attestation(&sk1, &env, &Symbol::new(&env, "att_rep"), &Symbol::new(&env, "research"));
+        let sig1 = sign_attestation(
+            &sk1,
+            &env,
+            &Symbol::new(&env, "att_rep"),
+            &Symbol::new(&env, "research"),
+        );
         client.attest_capability(
             &Symbol::new(&env, "att_rep"),
             &Symbol::new(&env, "research"),
@@ -2230,7 +2244,12 @@ mod test {
         let sk2 = make_signing_key();
         let pk2 = pubkey_bytes(&env, &sk2);
         let signer2 = Address::generate(&env);
-        let sig2 = sign_attestation(&sk2, &env, &Symbol::new(&env, "att_rep"), &Symbol::new(&env, "research"));
+        let sig2 = sign_attestation(
+            &sk2,
+            &env,
+            &Symbol::new(&env, "att_rep"),
+            &Symbol::new(&env, "research"),
+        );
         let att2 = client.attest_capability(
             &Symbol::new(&env, "att_rep"),
             &Symbol::new(&env, "research"),
@@ -2241,7 +2260,9 @@ mod test {
 
         assert_eq!(att2.signer_pubkey, pk2);
         assert_eq!(att2.signer, signer2);
-        let stored = client.get_attestation(&Symbol::new(&env, "att_rep")).unwrap();
+        let stored = client
+            .get_attestation(&Symbol::new(&env, "att_rep"))
+            .unwrap();
         assert_eq!(stored.signer_pubkey, pk2);
         assert_eq!(stored.signer, signer2);
     }
@@ -2252,7 +2273,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "ghost"), &Symbol::new(&env, "research"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "ghost"),
+            &Symbol::new(&env, "research"),
+        );
 
         assert_eq!(
             client.try_attest_capability(
@@ -2275,7 +2301,12 @@ mod test {
         let sk = make_signing_key();
         let _pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att_w"), &Symbol::new(&env, "coding"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att_w"),
+            &Symbol::new(&env, "coding"),
+        );
 
         let wrong_pk = pubkey_bytes(&env, &make_signing_key());
         let result = client.try_attest_capability(
@@ -2297,7 +2328,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att_m"), &Symbol::new(&env, "research"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att_m"),
+            &Symbol::new(&env, "research"),
+        );
 
         let result = client.try_attest_capability(
             &Symbol::new(&env, "att_m"),
@@ -2318,7 +2354,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att_ev"), &Symbol::new(&env, "analytics"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att_ev"),
+            &Symbol::new(&env, "analytics"),
+        );
 
         client.attest_capability(
             &Symbol::new(&env, "att_ev"),
@@ -2329,12 +2370,7 @@ mod test {
         );
 
         assert_eq!(env.events().all().len(), 1);
-        assert_event_topics(
-            &env,
-            0,
-            symbol_short!("registry"),
-            symbol_short!("att_cre"),
-        );
+        assert_event_topics(&env, 0, symbol_short!("registry"), symbol_short!("att_cre"));
     }
 
     #[test]
@@ -2348,7 +2384,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att_frz"), &Symbol::new(&env, "coding"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att_frz"),
+            &Symbol::new(&env, "coding"),
+        );
 
         let result = client.try_attest_capability(
             &Symbol::new(&env, "att_frz"),
@@ -2371,7 +2412,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att_p"), &Symbol::new(&env, "coding"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att_p"),
+            &Symbol::new(&env, "coding"),
+        );
 
         let result = client.try_attest_capability(
             &Symbol::new(&env, "att_p"),
@@ -2394,7 +2440,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att_v"), &Symbol::new(&env, "analytics"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att_v"),
+            &Symbol::new(&env, "analytics"),
+        );
 
         client.attest_capability(
             &Symbol::new(&env, "att_v"),
@@ -2422,7 +2473,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att_rv"), &Symbol::new(&env, "coding"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att_rv"),
+            &Symbol::new(&env, "coding"),
+        );
 
         client.attest_capability(
             &Symbol::new(&env, "att_rv"),
@@ -2439,7 +2495,8 @@ mod test {
     #[test]
     fn verify_attestation_returns_false_after_expiry() {
         let env = Env::default();
-        env.ledger().set_min_persistent_entry_ttl(DEFAULT_ATTESTATION_TTL as u32 + 100);
+        env.ledger()
+            .set_min_persistent_entry_ttl(DEFAULT_ATTESTATION_TTL as u32 + 100);
         env.mock_all_auths();
         let id = env.register(AgentRegistryContract, ());
         let client = AgentRegistryContractClient::new(&env, &id);
@@ -2449,7 +2506,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att_exp"), &Symbol::new(&env, "research"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att_exp"),
+            &Symbol::new(&env, "research"),
+        );
 
         client.attest_capability(
             &Symbol::new(&env, "att_exp"),
@@ -2459,16 +2521,12 @@ mod test {
             &sig,
         );
 
-        env.ledger().set_sequence_number(DEFAULT_ATTESTATION_TTL as u32 + 1);
+        env.ledger()
+            .set_sequence_number(DEFAULT_ATTESTATION_TTL as u32 + 1);
 
         assert!(!client.verify_attestation(&Symbol::new(&env, "att_exp")));
         assert_eq!(env.events().all().len(), 1);
-        assert_event_topics(
-            &env,
-            0,
-            symbol_short!("registry"),
-            symbol_short!("att_exp"),
-        );
+        assert_event_topics(&env, 0, symbol_short!("registry"), symbol_short!("att_exp"));
     }
 
     // ── revoke_attestation tests ──────────────────────────────────────────
@@ -2482,7 +2540,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att_rk"), &Symbol::new(&env, "coding"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att_rk"),
+            &Symbol::new(&env, "coding"),
+        );
 
         client.attest_capability(
             &Symbol::new(&env, "att_rk"),
@@ -2494,7 +2557,9 @@ mod test {
 
         client.revoke_attestation(&Symbol::new(&env, "att_rk"));
 
-        let stored = client.get_attestation(&Symbol::new(&env, "att_rk")).unwrap();
+        let stored = client
+            .get_attestation(&Symbol::new(&env, "att_rk"))
+            .unwrap();
         assert!(stored.revoked);
     }
 
@@ -2507,7 +2572,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att_re"), &Symbol::new(&env, "analytics"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att_re"),
+            &Symbol::new(&env, "analytics"),
+        );
 
         client.attest_capability(
             &Symbol::new(&env, "att_re"),
@@ -2520,12 +2590,7 @@ mod test {
         client.revoke_attestation(&Symbol::new(&env, "att_re"));
 
         assert_eq!(env.events().all().len(), 1);
-        assert_event_topics(
-            &env,
-            0,
-            symbol_short!("registry"),
-            symbol_short!("att_rvk"),
-        );
+        assert_event_topics(&env, 0, symbol_short!("registry"), symbol_short!("att_rvk"));
     }
 
     #[test]
@@ -2546,7 +2611,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att_ar"), &Symbol::new(&env, "coding"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att_ar"),
+            &Symbol::new(&env, "coding"),
+        );
 
         client.attest_capability(
             &Symbol::new(&env, "att_ar"),
@@ -2572,7 +2642,12 @@ mod test {
         let sk = make_signing_key();
         let pk = pubkey_bytes(&env, &sk);
         let signer = Address::generate(&env);
-        let sig = sign_attestation(&sk, &env, &Symbol::new(&env, "att_rp"), &Symbol::new(&env, "coding"));
+        let sig = sign_attestation(
+            &sk,
+            &env,
+            &Symbol::new(&env, "att_rp"),
+            &Symbol::new(&env, "coding"),
+        );
 
         client.attest_capability(
             &Symbol::new(&env, "att_rp"),

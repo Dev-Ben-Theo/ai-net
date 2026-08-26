@@ -95,10 +95,10 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 },
                 {
-                  "bytes": "a17fa4df30059bc65df5e8a72b4c5122783af10fa2282980ea3f6b69d3b300f3"
+                  "bytes": "9930f251539ee59d85b759fccdba85eb0f2877e0595dd5e6446e56beb3f36c79"
                 },
                 {
-                  "bytes": "0e802237882112a7cbb6895e42f60f9ebe9e73dd78477236c4d0aec5a995764f106b8c9fcfab22742b6d78a6d852deaa1accabf12c7aabf19ae74eb94cb29504"
+                  "bytes": "fce87b5dfec73dc934e12816ce40816f4524cea4597b885a09bcb3bbee36b8719fed41ba51499d1d0d9b28a1a7ff5fdf73509efe72ca1d2092303595b8f40c03"
                 }
               ]
             }
@@ -297,7 +297,7 @@
                         "symbol": "signature"
                       },
                       "val": {
-                        "bytes": "0e802237882112a7cbb6895e42f60f9ebe9e73dd78477236c4d0aec5a995764f106b8c9fcfab22742b6d78a6d852deaa1accabf12c7aabf19ae74eb94cb29504"
+                        "bytes": "fce87b5dfec73dc934e12816ce40816f4524cea4597b885a09bcb3bbee36b8719fed41ba51499d1d0d9b28a1a7ff5fdf73509efe72ca1d2092303595b8f40c03"
                       }
                     },
                     {
@@ -313,7 +313,7 @@
                         "symbol": "signer_pubkey"
                       },
                       "val": {
-                        "bytes": "a17fa4df30059bc65df5e8a72b4c5122783af10fa2282980ea3f6b69d3b300f3"
+                        "bytes": "9930f251539ee59d85b759fccdba85eb0f2877e0595dd5e6446e56beb3f36c79"
                       }
                     }
                   ]
