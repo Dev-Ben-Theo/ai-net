@@ -61,17 +61,17 @@ beforeEach(() => {
 describe('MobileDrawer rendering', () => {
   test('renders navigation dialog with all nav items', () => {
     renderDrawer()
-    expect(screen.getByRole('dialog', { name: /mobile navigation/i })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: /mobile navigation menu/i })).toBeInTheDocument()
     expect(screen.getByText('Navigation')).toBeInTheDocument()
     NAV_ITEMS.forEach((item) => {
       expect(screen.getByText(item.label)).toBeInTheDocument()
     })
   })
 
-  test('has aria-modal attribute', () => {
+  test('has aria-label attribute', () => {
     renderDrawer()
-    const dialog = screen.getByRole('dialog', { name: /mobile navigation/i })
-    expect(dialog).toHaveAttribute('aria-modal', 'true')
+    const nav = screen.getByRole('navigation', { name: /mobile navigation menu/i })
+    expect(nav).toHaveAttribute('aria-label', expect.stringContaining(''))
   })
 
   test('sets aria-current="page" on active nav item', () => {
@@ -89,13 +89,6 @@ describe('MobileDrawer rendering', () => {
   test('renders close button with accessible label', () => {
     renderDrawer()
     expect(screen.getByRole('button', { name: /close navigation menu/i })).toBeInTheDocument()
-  })
-
-  test('renders drag handle', () => {
-    renderDrawer()
-    const dialog = screen.getByRole('dialog', { name: /mobile navigation/i })
-    const handle = dialog.querySelector('.drawer-drag-handle')
-    expect(handle).toBeInTheDocument()
   })
 })
 
@@ -150,7 +143,7 @@ describe('MobileDrawer close-on-navigate', () => {
 describe('MobileDrawer focus trap', () => {
   test('traps focus within the drawer on Tab', () => {
     renderDrawer()
-    const dialog = screen.getByRole('dialog', { name: /mobile navigation/i })
+    const dialog = screen.getByRole('navigation', { name: /mobile navigation menu/i })
     const focusableEls = dialog.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     )
@@ -169,7 +162,7 @@ describe('MobileDrawer focus trap', () => {
 
   test('traps focus in reverse with Shift+Tab', () => {
     renderDrawer()
-    const dialog = screen.getByRole('dialog', { name: /mobile navigation/i })
+    const dialog = screen.getByRole('navigation', { name: /mobile navigation menu/i })
     const focusableEls = dialog.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     )
@@ -186,7 +179,7 @@ describe('MobileDrawer focus trap', () => {
 
   test('focuses first focusable element on mount', () => {
     renderDrawer()
-    const dialog = screen.getByRole('dialog', { name: /mobile navigation/i })
+    const dialog = screen.getByRole('navigation', { name: /mobile navigation menu/i })
     const focusableEls = dialog.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     )

@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react'
+import React, { forwardRef, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { LayoutDashboard, PlusCircle, Bot, Wallet, History } from 'lucide-react'
@@ -23,6 +23,41 @@ const MobileDrawer = forwardRef<HTMLDivElement, MobileDrawerProps>(({
   onNavigate 
 }, ref) => {
   const { t } = useTranslation()
+  const drawerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = drawerRef.current
+    if (!el) return
+    const focusable = el.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    )
+    if (focusable.length > 0) {
+      focusable[0].focus()
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+      const els = Array.from(focusable)
+      if (els.length === 0) return
+      const first = els[0]
+      const last = els[els.length - 1]
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+
+    el.addEventListener('keydown', handleKeyDown)
+    return () => el.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const navItems = [
     { path: '/', icon: <LayoutDashboard size={20} />, label: t('nav.dashboard') },
@@ -49,7 +84,11 @@ const MobileDrawer = forwardRef<HTMLDivElement, MobileDrawerProps>(({
         onClick={onClose}
       />
       <motion.div
-        ref={ref}
+        ref={(node) => {
+          drawerRef.current = node
+          if (typeof ref === 'function') ref(node)
+          else if (ref) ref.current = node
+        }}
         className="mobile-drawer"
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
