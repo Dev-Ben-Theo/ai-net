@@ -87,6 +87,39 @@ router.get("/deep", async (_req: Request, res: Response) => {
   });
 });
 
+/**
+ * @openapi
+ * /health/ready:
+ *   get:
+ *     summary: Readiness probe
+ *     operationId: getReadiness
+ *     description: Verifies database connectivity for task and payment subsystems. Returns 200 when ready to serve traffic, 500/503 otherwise.
+ *     tags: [Health]
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Subsystems are healthy and ready
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ReadinessStatus'
+ *             example:
+ *               status: "ok"
+ *               checks:
+ *                 tasks: "ok"
+ *                 payments: "ok"
+ *       500:
+ *         description: One or more subsystems failed readiness checks
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ReadinessStatus'
+ *             example:
+ *               status: "error"
+ *               checks:
+ *                 tasks: "ok"
+ *                 payments: "error"
+ */
 router.get("/ready", async (_req: Request, res: Response) => {
   const checks: Record<string, "ok" | "error"> = {
     tasks: "ok",

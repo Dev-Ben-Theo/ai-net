@@ -36,8 +36,13 @@ import { createV2TasksRouter } from "./routes/v2/tasks";
 import { createLogger } from "../utils/logger";
 import { createTaskDb, getTaskDb } from "../db/tasks";
 import { createHeartbeatService, type HeartbeatServiceOptions } from "../services/heartbeat";
-import { openapiSpec } from "./docs/openapi";
 import { createTaskJobHandler } from "../coordinator/coordinator";
+import {
+  openapiSpec,
+  swaggerUiOptions,
+  getOpenapiJson,
+  getOpenapiYaml,
+} from "./docs";
 import {
   getGlobalJobQueue,
   createJobStore,
@@ -163,10 +168,21 @@ export function createApp(opts: AppOptions = {}): {
   app.use("/api/agents", agentsRouter);
 
   // ── API docs ─────────────────────────────────────────────────────────────────
-  app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec));
   app.get("/openapi.json", (_req: Request, res: Response) => {
-    res.json(openapiSpec);
+    res.json(getOpenapiJson());
   });
+  app.get("/openapi.yaml", (_req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/yaml; charset=utf-8");
+    res.send(getOpenapiYaml());
+  });
+  app.get("/docs/swagger.json", (_req: Request, res: Response) => {
+    res.json(getOpenapiJson());
+  });
+  app.get("/docs/swagger.yaml", (_req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/yaml; charset=utf-8");
+    res.send(getOpenapiYaml());
+  });
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec, swaggerUiOptions));
 
   // ── Task routes ────────────────────────────────────────────────────────────
   // Create version-specific routers
@@ -220,7 +236,11 @@ export function createApp(opts: AppOptions = {}): {
     jobWorker.stop();
     heartbeatService.stop();
     detachStream();
-    httpServer.close(callback);
+    if (httpServer.listening) {
+      httpServer.close(callback);
+    } else if (callback) {
+      callback();
+    }
   }
 
   return { httpServer, close };
