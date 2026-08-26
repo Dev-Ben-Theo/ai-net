@@ -12,14 +12,14 @@ function makeReq(path = "/api/test"): Request {
   return { path, method: "GET" } as unknown as Request;
 }
 
-function makeRes(requestId = "req-123"): {
-  locals: { requestId: string };
+function makeRes(requestId = "req-123", correlationId = "corr-123"): {
+  locals: { requestId: string; correlationId: string };
   status: jest.Mock;
   json: jest.Mock;
   _body?: unknown;
 } {
   const res = {
-    locals: { requestId },
+    locals: { requestId, correlationId },
     status: jest.fn().mockReturnThis(),
     json: jest.fn().mockReturnThis(),
   };
@@ -54,9 +54,9 @@ describe("errorHandler — production mode", () => {
 
     expect(res.status).toHaveBeenCalledWith(500);
     const body = res.json.mock.calls[0][0];
-    expect(body.error).not.toContain("SQLITE_CONSTRAINT");
-    expect(body.error).not.toBe(err.message);
-    expect(body.message).toBe(
+    // error is now a structured object — message must not leak internals
+    expect(body.error.message).not.toContain("SQLITE_CONSTRAINT");
+    expect(body.error.message).toBe(
       "An unexpected error occurred. Please try again later.",
     );
   });
@@ -70,10 +70,11 @@ describe("errorHandler — production mode", () => {
     errorHandler(err, makeReq(), res as unknown as Response, jest.fn() as NextFunction);
 
     const body = res.json.mock.calls[0][0];
+    expect(body.error.stack).toBeUndefined();
     expect(body.stack).toBeUndefined();
   });
 
-  it("uses err.code when present", () => {
+  it("always uses INTERNAL_SERVER_ERROR code in production (no leaking err.code)", () => {
     const errorHandler = freshErrorHandler("production");
     const err: any = new Error("db is down");
     err.code = "DB_UNAVAILABLE";
@@ -82,7 +83,7 @@ describe("errorHandler — production mode", () => {
     errorHandler(err, makeReq(), res as unknown as Response, jest.fn() as NextFunction);
 
     const body = res.json.mock.calls[0][0];
-    expect(body.error).toBe("DB_UNAVAILABLE");
+    expect(body.error.code).toBe("INTERNAL_SERVER_ERROR");
   });
 
   it("falls back to INTERNAL_SERVER_ERROR when err.code is absent", () => {
@@ -93,7 +94,7 @@ describe("errorHandler — production mode", () => {
     errorHandler(err, makeReq(), res as unknown as Response, jest.fn() as NextFunction);
 
     const body = res.json.mock.calls[0][0];
-    expect(body.error).toBe("INTERNAL_SERVER_ERROR");
+    expect(body.error.code).toBe("INTERNAL_SERVER_ERROR");
   });
 
   it("respects err.statusCode", () => {
@@ -136,6 +137,22 @@ describe("errorHandler — production mode", () => {
     const body = res.json.mock.calls[0][0];
     expect(body.path).toBe("/api/agents");
   });
+
+  it("error response includes correlationId and timestamp", () => {
+    const errorHandler = freshErrorHandler("production");
+    const res = makeRes("req-1", "corr-1");
+
+    errorHandler(
+      new Error("oops"),
+      makeReq(),
+      res as unknown as Response,
+      jest.fn() as NextFunction,
+    );
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.error.correlationId).toBe("corr-1");
+    expect(body.error.timestamp).toBeDefined();
+  });
 });
 
 // ── Development mode ──────────────────────────────────────────────────────────
@@ -149,7 +166,7 @@ describe("errorHandler — development mode", () => {
     errorHandler(err, makeReq(), res as unknown as Response, jest.fn() as NextFunction);
 
     const body = res.json.mock.calls[0][0];
-    expect(body.error).toBe(err.message);
+    expect(body.error.message).toBe(err.message);
   });
 
   it("includes the stack trace", () => {
@@ -161,22 +178,7 @@ describe("errorHandler — development mode", () => {
     errorHandler(err, makeReq(), res as unknown as Response, jest.fn() as NextFunction);
 
     const body = res.json.mock.calls[0][0];
-    expect(body.stack).toBe(err.stack);
-  });
-
-  it("does not include a generic message field", () => {
-    const errorHandler = freshErrorHandler("development");
-    const res = makeRes();
-
-    errorHandler(
-      new Error("debug detail"),
-      makeReq(),
-      res as unknown as Response,
-      jest.fn() as NextFunction,
-    );
-
-    const body = res.json.mock.calls[0][0];
-    expect(body.message).toBeUndefined();
+    expect(body.error.stack).toBe(err.stack);
   });
 
   it("always includes requestId in the response", () => {
@@ -192,5 +194,55 @@ describe("errorHandler — development mode", () => {
 
     const body = res.json.mock.calls[0][0];
     expect(body.requestId).toBe("dev-req-42");
+  });
+});
+
+// ── AppError instances ────────────────────────────────────────────────────────
+
+describe("errorHandler — AppError instances", () => {
+  it("uses AppError.statusCode, code, and message", () => {
+    jest.resetModules();
+    process.env.NODE_ENV = "production";
+    const { errorHandler } = require("../src/api/middleware/errorHandler");
+    const { NotFoundError } = require("../src/errors");
+    const res = makeRes();
+
+    const err = new NotFoundError("Task", "task-123");
+    errorHandler(err, makeReq(), res as unknown as Response, jest.fn() as NextFunction);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    const body = res.json.mock.calls[0][0];
+    expect(body.error.code).toBe("NOT_FOUND");
+    expect(body.error.message).toBe("Task 'task-123' not found");
+    expect(body.error.correlationId).toBe(err.correlationId);
+  });
+
+  it("does not include details in production for AppError", () => {
+    jest.resetModules();
+    process.env.NODE_ENV = "production";
+    const { errorHandler } = require("../src/api/middleware/errorHandler");
+    const { ValidationError } = require("../src/errors");
+    const res = makeRes();
+
+    const err = new ValidationError("Bad input", { field: "prompt" });
+    errorHandler(err, makeReq(), res as unknown as Response, jest.fn() as NextFunction);
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.error.details).toBeUndefined();
+  });
+
+  it("includes details in development for AppError", () => {
+    jest.resetModules();
+    process.env.NODE_ENV = "development";
+    const { errorHandler } = require("../src/api/middleware/errorHandler");
+    const { ValidationError } = require("../src/errors");
+    const res = makeRes();
+
+    const details = { field: "prompt", reason: "too long" };
+    const err = new ValidationError("Bad input", details);
+    errorHandler(err, makeReq(), res as unknown as Response, jest.fn() as NextFunction);
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.error.details).toEqual(details);
   });
 });

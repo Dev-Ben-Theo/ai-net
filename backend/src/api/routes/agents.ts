@@ -1,8 +1,9 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { Horizon, Keypair } from "@stellar/stellar-sdk";
 import { getAgentDb, createAgentDb, AgentDb } from "../../db/agents";
 import { heartbeatRateLimitMiddleware } from "../middleware/rateLimit";
+import { NotFoundError, ValidationError, AuthenticationError } from "../../errors";
 
 export interface AgentsRouterOptions {
   healthTimeoutMs?: number;
@@ -67,7 +68,7 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    *               $ref: '#/components/schemas/Error'
    */
   // GET /api/agents
-  router.get("/", (req: Request, res: Response): void => {
+  router.get("/", (req: Request, res: Response, next: NextFunction): void => {
     const db = getDb();
     const capability = req.query.capability as string | undefined;
     const minReputation = req.query.minReputation ? parseFloat(req.query.minReputation as string) : undefined;
@@ -77,7 +78,7 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
       const agents = db.list({ capability, minReputation, maxPriceXLM });
       res.json(agents);
     } catch (err) {
-      res.status(500).json({ error: "Internal Server Error" });
+      next(err);
     }
   });
 
@@ -109,14 +110,18 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    *               $ref: '#/components/schemas/Error'
    */
   // GET /api/agents/:id
-  router.get("/:id", (req: Request, res: Response): void => {
-    const db = getDb();
-    const agent = db.findById(req.params.id);
-    if (!agent) {
-      res.status(404).json({ error: "Agent not found" });
-      return;
+  router.get("/:id", (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      const correlationId = res.locals.correlationId as string | undefined;
+      const db = getDb();
+      const agent = db.findById(req.params.id);
+      if (!agent) {
+        throw new NotFoundError("Agent", req.params.id, undefined, correlationId);
+      }
+      res.json(agent);
+    } catch (err) {
+      next(err);
     }
-    res.json(agent);
   });
 
   /**
@@ -158,35 +163,39 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    *               $ref: '#/components/schemas/Error'
    */
   // GET /api/agents/:id/health
-  router.get("/:id/health", async (req: Request, res: Response): Promise<void> => {
-    const db = getDb();
-    const agent = db.findById(req.params.id);
-    if (!agent) {
-      res.status(404).json({ error: "Agent not found" });
-      return;
-    }
-
-    const startedAt = Date.now();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), healthTimeoutMs);
-
+  router.get("/:id/health", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const response = await fetch(agent.endpoint, {
-        method: "GET",
-        signal: controller.signal,
-      });
+      const correlationId = res.locals.correlationId as string | undefined;
+      const db = getDb();
+      const agent = db.findById(req.params.id);
+      if (!agent) {
+        throw new NotFoundError("Agent", req.params.id, undefined, correlationId);
+      }
 
-      res.status(200).json({
-        status: response.ok ? "healthy" : "unreachable",
-        latencyMs: Date.now() - startedAt,
-      });
-    } catch {
-      res.status(200).json({
-        status: "unreachable",
-        latencyMs: Date.now() - startedAt,
-      });
-    } finally {
-      clearTimeout(timeout);
+      const startedAt = Date.now();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), healthTimeoutMs);
+
+      try {
+        const response = await fetch(agent.endpoint, {
+          method: "GET",
+          signal: controller.signal,
+        });
+
+        res.status(200).json({
+          status: response.ok ? "healthy" : "unreachable",
+          latencyMs: Date.now() - startedAt,
+        });
+      } catch {
+        res.status(200).json({
+          status: "unreachable",
+          latencyMs: Date.now() - startedAt,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch (err) {
+      next(err);
     }
   });
 
@@ -277,46 +286,60 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    *               $ref: '#/components/schemas/Error'
    */
   // POST /api/agents/register
-  router.post("/register", async (req: Request, res: Response): Promise<void> => {
-    const parse = RegisterAgentSchema.safeParse(req.body);
-    if (!parse.success) {
-      res.status(400).json({ error: parse.error.flatten() });
-      return;
-    }
-    
-    const data = parse.data;
-    
-    // Verify Stellar account exists
-    if (process.env.SKIP_STELLAR_ACCOUNT_VERIFY !== "true") {
-      try {
-        await horizon.loadAccount(data.stellarPublicKey);
-      } catch (err: any) {
-        if (err?.response?.status === 404) {
-          res.status(400).json({ error: "StellarAccountNotFound" });
-          return;
-        }
-        if (process.env.NODE_ENV !== "test") {
-          res.status(400).json({ error: "Failed to verify Stellar account", details: err.message });
-          return;
+  router.post("/register", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const correlationId = res.locals.correlationId as string | undefined;
+      const parse = RegisterAgentSchema.safeParse(req.body);
+      if (!parse.success) {
+        throw new ValidationError(
+          "Invalid agent registration data",
+          { issues: parse.error.flatten() },
+          correlationId,
+        );
+      }
+      
+      const data = parse.data;
+      
+      // Verify Stellar account exists
+      if (process.env.SKIP_STELLAR_ACCOUNT_VERIFY !== "true") {
+        try {
+          await horizon.loadAccount(data.stellarPublicKey);
+        } catch (err: any) {
+          if (err?.response?.status === 404) {
+            throw new ValidationError(
+              "Stellar account not found",
+              { stellarPublicKey: data.stellarPublicKey, code: "StellarAccountNotFound" },
+              correlationId,
+            );
+          }
+          if (process.env.NODE_ENV !== "test") {
+            throw new ValidationError(
+              "Failed to verify Stellar account",
+              { reason: err.message },
+              correlationId,
+            );
+          }
         }
       }
+      
+      const db = getDb();
+      const agent = {
+        id: data.agentId,
+        capabilities: data.capabilities,
+        pricingXLM: data.pricingXLM,
+        endpoint: data.endpoint,
+        stellarPublicKey: data.stellarPublicKey,
+        reputationScore: 0,
+        lastSeenAt: new Date().toISOString(),
+        status: 'online' as const
+      };
+      
+      db.upsert(agent);
+      
+      res.status(201).json(agent);
+    } catch (err) {
+      next(err);
     }
-    
-    const db = getDb();
-    const agent = {
-      id: data.agentId,
-      capabilities: data.capabilities,
-      pricingXLM: data.pricingXLM,
-      endpoint: data.endpoint,
-      stellarPublicKey: data.stellarPublicKey,
-      reputationScore: 0,
-      lastSeenAt: new Date().toISOString(),
-      status: 'online' as const
-    };
-    
-    db.upsert(agent);
-    
-    res.status(201).json(agent);
   });
 
   /**
@@ -354,53 +377,59 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    *               $ref: '#/components/schemas/Error'
    */
   // POST /api/agents/:id/heartbeat
-  router.post("/:id/heartbeat", heartbeatRateLimitMiddleware, (req: Request, res: Response): void => {
-    const db = getDb();
-    const agent = db.findById(req.params.id);
-    if (!agent) {
-      res.status(404).json({ error: "Agent not found" });
-      return;
-    }
+  router.post("/:id/heartbeat", heartbeatRateLimitMiddleware, (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      const correlationId = res.locals.correlationId as string | undefined;
+      const db = getDb();
+      const agent = db.findById(req.params.id);
+      if (!agent) {
+        throw new NotFoundError("Agent", req.params.id, undefined, correlationId);
+      }
 
-    db.upsert({ ...agent, lastSeenAt: new Date().toISOString(), status: 'online' });
-    const updated = db.findById(req.params.id);
-    res.status(200).json({
-      status: "ok",
-      lastSeenAt: updated?.lastSeenAt ?? new Date().toISOString(),
-    });
+      db.upsert({ ...agent, lastSeenAt: new Date().toISOString(), status: 'online' });
+      const updated = db.findById(req.params.id);
+      res.status(200).json({
+        status: "ok",
+        lastSeenAt: updated?.lastSeenAt ?? new Date().toISOString(),
+      });
+    } catch (err) {
+      next(err);
+    }
   });
 
   // DELETE /api/agents/:id
-  router.delete("/:id", (req: Request, res: Response): void => {
-    const db = getDb();
-    const agent = db.findById(req.params.id);
-    if (!agent) {
-      res.status(404).json({ error: "Agent not found" });
-      return;
-    }
-    
-    const signature = req.headers["x-signature"] as string;
-    const challenge = req.headers["x-challenge"] as string;
-    
-    if (!signature || !challenge) {
-      res.status(401).json({ error: "Missing challenge or signature" });
-      return;
-    }
-    
+  router.delete("/:id", (req: Request, res: Response, next: NextFunction): void => {
     try {
-      const keypair = Keypair.fromPublicKey(agent.stellarPublicKey);
-      const isValid = keypair.verify(Buffer.from(challenge), Buffer.from(signature, "base64"));
-      if (!isValid) {
-        res.status(401).json({ error: "Invalid signature" });
-        return;
+      const correlationId = res.locals.correlationId as string | undefined;
+      const db = getDb();
+      const agent = db.findById(req.params.id);
+      if (!agent) {
+        throw new NotFoundError("Agent", req.params.id, undefined, correlationId);
       }
+      
+      const signature = req.headers["x-signature"] as string;
+      const challenge = req.headers["x-challenge"] as string;
+      
+      if (!signature || !challenge) {
+        throw new AuthenticationError("Missing challenge or signature", undefined, correlationId);
+      }
+      
+      try {
+        const keypair = Keypair.fromPublicKey(agent.stellarPublicKey);
+        const isValid = keypair.verify(Buffer.from(challenge), Buffer.from(signature, "base64"));
+        if (!isValid) {
+          throw new AuthenticationError("Invalid signature", undefined, correlationId);
+        }
+      } catch (innerErr) {
+        if (innerErr instanceof AuthenticationError) throw innerErr;
+        throw new AuthenticationError("Invalid signature format", undefined, correlationId);
+      }
+      
+      db.delete(req.params.id);
+      res.json({ message: "Agent deleted successfully" });
     } catch (err) {
-      res.status(401).json({ error: "Invalid signature format" });
-      return;
+      next(err);
     }
-    
-    db.delete(req.params.id);
-    res.json({ message: "Agent deleted successfully" });
   });
 
   return router;
