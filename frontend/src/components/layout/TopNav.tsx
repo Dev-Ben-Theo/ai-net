@@ -1,10 +1,15 @@
-import React from 'react'
+import React, { useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Bell } from 'lucide-react'
 import { useWallet } from '../../context/WalletContext'
+import { useNotifications } from '../../hooks/useNotifications'
+import { NotificationCenter } from '../notifications/NotificationCenter'
 import { SUPPORTED_LANGUAGES } from '../../i18n/options'
 import type { SupportedLanguage } from '../../i18n/options'
 import './TopNav.css'
+import useTheme from '../../hooks/useTheme'
+import { Sun, Moon, Monitor } from 'lucide-react'
 
 interface TopNavProps {
   onMenuClick: () => void
@@ -37,8 +42,12 @@ const TopNav: React.FC<TopNavProps> = ({
   isDrawerOpen = false,
 }) => {
   const { publicKey, connected, ready, connectionMethod, disconnect } = useWallet()
+  const { unreadCount } = useNotifications()
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const bellButtonRef = useRef<HTMLButtonElement>(null)
   const { t, i18n } = useTranslation()
   const location = useLocation()
+  const { mode, setMode } = useTheme()
 
   const activeLanguage = (i18n.resolvedLanguage ?? 'en') as SupportedLanguage
 
@@ -98,6 +107,47 @@ const TopNav: React.FC<TopNavProps> = ({
       </div>
 
       <div className="nav-right">
+        <div className="notification-wrapper">
+          <button
+            ref={bellButtonRef}
+            type="button"
+            className={`notification-bell-btn ${isNotificationOpen ? 'active' : ''}`}
+            onClick={() => setIsNotificationOpen(prev => !prev)}
+            aria-label="Notifications"
+            aria-expanded={isNotificationOpen}
+            id="btn-notifications"
+            data-testid="notification-bell-btn"
+          >
+            <Bell size={20} />
+            {unreadCount > 0 && (
+              <span className="notification-badge" data-testid="notification-badge">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          <NotificationCenter
+            isOpen={isNotificationOpen}
+            onClose={() => setIsNotificationOpen(false)}
+            anchorRef={bellButtonRef}
+          />
+        </div>
+
+        {/* Theme toggle: cycles light -> dark -> system */}
+        <button
+          className="theme-toggle"
+          onClick={() => {
+            const next: Record<string, 'light' | 'dark' | 'system'> = { light: 'dark', dark: 'system', system: 'light' }
+            setMode(next[mode])
+          }}
+          role="switch"
+          aria-label={mode === 'light' ? 'Switch to dark or system theme' : mode === 'dark' ? 'Switch to system or light theme' : 'Switch to light or dark theme'}
+          aria-checked={mode === 'dark' ? 'true' : mode === 'light' ? 'false' : 'mixed'}
+          title={`Theme: ${mode}`}
+        >
+          {mode === 'light' ? <Sun size={16} /> : mode === 'dark' ? <Moon size={16} /> : <Monitor size={16} />}
+        </button>
+
         <div
           className="language-switcher"
           id="language-switcher"
@@ -123,7 +173,6 @@ const TopNav: React.FC<TopNavProps> = ({
             </button>
           ))}
         </div>
-
         {connected && publicKey ? (
           ready ? (
             <>

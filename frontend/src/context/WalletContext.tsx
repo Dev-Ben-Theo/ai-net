@@ -25,6 +25,8 @@ interface WalletContextType {
   connect: (secretKey: string) => Promise<void>
   connectFreighter: () => Promise<void>
   disconnect: () => void
+  hasCompletedWizard: boolean
+  completeWizard: () => void
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
@@ -42,6 +44,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return null
   })
   const [freighterAvailable, setFreighterAvailable] = useState(false)
+  const [hasCompletedWizard, setHasCompletedWizard] = useState<boolean>(() => {
+    return localStorage.getItem('wallet_wizard_completed') === 'true'
+  })
+
+  const completeWizard = () => {
+    setHasCompletedWizard(true)
+    localStorage.setItem('wallet_wizard_completed', 'true')
+  }
 
   const connected = !!publicKey
   // ready means the wallet can actually sign transactions:
@@ -123,6 +133,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         connect,
         connectFreighter,
         disconnect,
+        hasCompletedWizard,
+        completeWizard,
       }}
     >
       {children}

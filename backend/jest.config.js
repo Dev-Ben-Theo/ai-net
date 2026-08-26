@@ -24,4 +24,28 @@ module.exports = {
     '^@stellar/stellar-sdk$': '<rootDir>/__mocks__/@stellar/stellar-sdk.js',
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.d.ts',
+    '!src/**/*.test.ts',
+    '!src/**/*.spec.ts',
+    '!src/**/index.ts',
+    '!src/**/.gitkeep',
+    // Excluded from unit coverage — tested via Stellar E2E suite
+    '!src/registry/sync.ts',
+    // WebSocket streaming layer — covered by E2E/integration tests
+    '!src/api/routes/stream.ts',
+    // Bootstrap/entrypoint
+    '!src/index.ts',
+    '!src/checkSpec.ts',
+  ],
+  coverageThresholds: {
+    global: {
+      statements: 90,
+      branches: 80,
+      functions: 85,
+      lines: 90,
+    },
+  },
+  coverageReporters: ['text', 'lcov', 'html'],
 };

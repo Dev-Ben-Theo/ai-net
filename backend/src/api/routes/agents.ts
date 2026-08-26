@@ -319,8 +319,42 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
     res.status(201).json(agent);
   });
 
+  /**
+   * @openapi
+   * /api/agents/{id}/heartbeat:
+   *   post:
+   *     summary: Agent heartbeat ping
+   *     description: Updates the agent's lastSeenAt timestamp and sets status to online.
+   *     tags: [Agents]
+   *     security: []
+   *     operationId: agentHeartbeat
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema: { type: string }
+   *     responses:
+   *       200:
+   *         description: Heartbeat recorded
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 status:
+   *                   type: string
+   *                   example: ok
+   *                 lastSeenAt:
+   *                   type: string
+   *       404:
+   *         description: Agent not found
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Error'
+   */
   // POST /api/agents/:id/heartbeat
-  router.post("/:id/heartbeat", (req: Request, res: Response): void => {
+  router.post("/:id/heartbeat", heartbeatRateLimitMiddleware, (req: Request, res: Response): void => {
     const db = getDb();
     const agent = db.findById(req.params.id);
     if (!agent) {
