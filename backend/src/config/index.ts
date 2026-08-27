@@ -66,6 +66,23 @@ const envSchema = z.object({
   API_DEFAULT_VERSION: z.string().default("1.0"),
   /** Sunset date for deprecated API versions (ISO 8601 format). Optional. */
   API_V1_SUNSET_DATE: z.string().optional(),
+
+  // ── Admin API ───────────────────────────────────────────────────────────────
+  /**
+   * Shared secret required by admin-only endpoints such as
+   * `GET /health/dashboard`. Sent as `X-Admin-API-Key: <key>` or
+   * `Authorization: Bearer <key>`. When unset, those endpoints refuse every
+   * request with 503 rather than falling open.
+   */
+  ADMIN_API_KEY: z.string().min(1).optional(),
+
+  // ── Health dashboard metrics ────────────────────────────────────────────────
+  /** How long a dashboard snapshot is served before recollection. Default: 5 000 (5 s). */
+  METRICS_CACHE_TTL_MS: z.coerce.number().int().positive().default(5_000),
+  /** Rolling window used for request rate/latency/error analytics. Default: 60 000 (1 min). */
+  METRICS_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  /** Maximum request samples retained in memory. Default: 1 000. */
+  METRICS_MAX_SAMPLES: z.coerce.number().int().positive().default(1_000),
 });
 
 

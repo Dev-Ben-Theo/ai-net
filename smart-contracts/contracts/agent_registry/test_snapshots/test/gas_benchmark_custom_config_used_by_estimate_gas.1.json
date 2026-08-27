@@ -19,6 +19,14 @@
                   "map": [
                     {
                       "key": {
+                        "symbol": "deregister_with_bond"
+                      },
+                      "val": {
+                        "u64": 80000
+                      }
+                    },
+                    {
+                      "key": {
                         "symbol": "register_agent"
                       },
                       "val": {
@@ -47,6 +55,14 @@
                       },
                       "val": {
                         "u64": 20000
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "slash_bond"
+                      },
+                      "val": {
+                        "u64": 60000
                       }
                     },
                     {
@@ -129,6 +145,14 @@
                           "map": [
                             {
                               "key": {
+                                "symbol": "deregister_with_bond"
+                              },
+                              "val": {
+                                "u64": 80000
+                              }
+                            },
+                            {
+                              "key": {
                                 "symbol": "register_agent"
                               },
                               "val": {
@@ -157,6 +181,14 @@
                               },
                               "val": {
                                 "u64": 20000
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "slash_bond"
+                              },
+                              "val": {
+                                "u64": 60000
                               }
                             },
                             {
