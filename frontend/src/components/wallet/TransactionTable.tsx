@@ -1,11 +1,15 @@
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { ExternalLink, ArrowUpRight, ArrowDownRight, Clock } from 'lucide-react'
+import { ExternalLink, ArrowUpRight, ArrowDownRight, Clock, Search } from 'lucide-react'
 import type { TransactionEvent } from '../../hooks/useTransactionHistory'
+import { filterTransactions, computeRunningTotal } from '../../hooks/useTransactionHistory'
 import styles from './TransactionTable.module.css'
 import { formatDate } from '../../utils/format'
+import { ExportButton } from './ExportButton'
 
 const STELLAR_EXPLORER = 'https://stellar.expert/explorer/testnet'
+const PAGE_SIZE_OPTIONS = [25, 50, 100] as const
 
 interface TransactionTableProps {
   transactions: TransactionEvent[]
@@ -40,6 +44,28 @@ function truncateAddress(addr: string): string {
 
 export function TransactionTable({ transactions, loading, publicKey }: TransactionTableProps) {
   const { t, i18n } = useTranslation()
+  const [search, setSearch] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [pageSize, setPageSize] = useState<number>(25)
+  const [page, setPage] = useState(1)
+
+  const filtered = useMemo(
+    () => filterTransactions(transactions, { search, from: dateFrom || null, to: dateTo || null }),
+    [transactions, search, dateFrom, dateTo]
+  )
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pageItems = useMemo(
+    () => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filtered, currentPage, pageSize]
+  )
+  const runningTotal = useMemo(() => computeRunningTotal(filtered), [filtered])
+
+  // Any change that narrows/widens the result set can strand the user on a page
+  // past the new end, so every filter/page-size change snaps back to page 1.
+  const resetToFirstPage = () => setPage(1)
 
   if (!publicKey) {
     return (
@@ -83,7 +109,62 @@ export function TransactionTable({ transactions, loading, publicKey }: Transacti
 
   return (
     <div className={styles.container}>
-      <h3 className={styles.heading}>{t('wallet.tx.heading')}</h3>
+      <div className={styles.toolbarHeader}>
+        <h3 className={styles.heading}>{t('wallet.tx.heading')}</h3>
+        <ExportButton transactions={filtered} publicKey={publicKey} />
+      </div>
+
+      <div className={styles.toolbar}>
+        <div className={styles.searchField}>
+          <Search size={14} className={styles.searchIcon} />
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder={t('wallet.tx.searchPlaceholder')}
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              resetToFirstPage()
+            }}
+            aria-label={t('wallet.tx.searchPlaceholder')}
+          />
+        </div>
+        <div className={styles.dateFilters}>
+          <label className={styles.dateLabel}>
+            {t('wallet.tx.from')}
+            <input
+              type="date"
+              className={styles.dateInput}
+              value={dateFrom}
+              max={dateTo || undefined}
+              onChange={(e) => {
+                setDateFrom(e.target.value)
+                resetToFirstPage()
+              }}
+            />
+          </label>
+          <label className={styles.dateLabel}>
+            {t('wallet.tx.to')}
+            <input
+              type="date"
+              className={styles.dateInput}
+              value={dateTo}
+              min={dateFrom || undefined}
+              onChange={(e) => {
+                setDateTo(e.target.value)
+                resetToFirstPage()
+              }}
+            />
+          </label>
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className={styles.emptyState}>
+          <Clock size={32} className={styles.emptyIcon} />
+          <p>{t('wallet.tx.noMatches')}</p>
+        </div>
+      ) : (
       <div className={styles.table}>
         <div className={styles.header}>
           <span className={styles.colDirection}>{t('wallet.tx.type')}</span>
@@ -93,7 +174,7 @@ export function TransactionTable({ transactions, loading, publicKey }: Transacti
           <span className={styles.colTime}>{t('wallet.tx.time')}</span>
           <span className={styles.colTx}>{t('wallet.tx.tx')}</span>
         </div>
-        {transactions.map((tx) => (
+        {pageItems.map((tx) => (
           <div key={tx.txHash} className={styles.row}>
             <span className={styles.colDirection}>
               {tx.direction === 'in' ? (
@@ -141,6 +222,59 @@ export function TransactionTable({ transactions, loading, publicKey }: Transacti
           </div>
         ))}
       </div>
+      )}
+
+      {filtered.length > 0 && (
+        <div className={styles.footer}>
+          <div className={styles.pagination}>
+            <label className={styles.pageSizeLabel}>
+              {t('wallet.tx.perPage')}
+              <select
+                className={styles.pageSizeSelect}
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value))
+                  resetToFirstPage()
+                }}
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className={styles.pageControls}>
+              <button
+                type="button"
+                className={styles.pageButton}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+              >
+                {t('wallet.tx.prev')}
+              </button>
+              <span className={styles.pageIndicator}>
+                {t('wallet.tx.pageIndicator', { current: currentPage, total: totalPages })}
+              </span>
+              <button
+                type="button"
+                className={styles.pageButton}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                {t('wallet.tx.next')}
+              </button>
+            </div>
+          </div>
+          <div className={styles.runningTotal}>
+            {t('wallet.tx.runningTotal')}:{' '}
+            <span className={runningTotal >= 0 ? styles.amountIn : styles.amountOut}>
+              {runningTotal >= 0 ? '+' : ''}
+              {runningTotal.toFixed(7)} XLM
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
