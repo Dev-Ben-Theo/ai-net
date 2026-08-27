@@ -23,7 +23,7 @@ const MobileDrawer = forwardRef<HTMLDivElement, MobileDrawerProps>(({
   onNavigate 
 }, ref) => {
   const { t } = useTranslation()
-  const drawerRef = useRef<HTMLDivElement>(null)
+  const drawerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const el = drawerRef.current
@@ -87,7 +87,7 @@ const MobileDrawer = forwardRef<HTMLDivElement, MobileDrawerProps>(({
         ref={(node) => {
           drawerRef.current = node
           if (typeof ref === 'function') ref(node)
-          else if (ref) ref.current = node
+          else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node
         }}
         className="mobile-drawer"
         initial={{ y: '100%' }}
