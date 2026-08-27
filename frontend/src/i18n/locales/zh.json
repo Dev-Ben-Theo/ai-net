@@ -247,6 +247,7 @@
   "a11y.breadcrumb": "面包屑导航",
   "a11y.expandSidebar": "展开侧边栏",
   "a11y.collapseSidebar": "收起侧边栏",
+  "a11y.sidebar": "侧边栏",
   "a11y.search": "搜索",
   "a11y.closeSearch": "关闭搜索",
   "a11y.copyPublicKey": "复制公钥",

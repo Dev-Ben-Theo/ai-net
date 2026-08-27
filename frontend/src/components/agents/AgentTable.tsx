@@ -46,9 +46,9 @@ export function AgentTable({
       <table className={styles.table} id="agent-table">
         <thead>
           <tr>
-            <th>{t('agent.table.agentId')}</th>
-            <th>{t('common.capabilities')}</th>
-            <th>
+            <th scope="col">{t('agent.table.agentId')}</th>
+            <th scope="col">{t('common.capabilities')}</th>
+            <th scope="col">
               <button
                 type="button"
                 className={styles.sortButton}
@@ -59,7 +59,7 @@ export function AgentTable({
                 <SortIcon active={sortKey === 'price'} dir={sortDir} />
               </button>
             </th>
-            <th>
+            <th scope="col">
               <button
                 type="button"
                 className={styles.sortButton}
@@ -70,8 +70,8 @@ export function AgentTable({
                 <SortIcon active={sortKey === 'reputation'} dir={sortDir} />
               </button>
             </th>
-            <th>{t('common.status')}</th>
-            <th>{t('agent.table.actions')}</th>
+            <th scope="col">{t('common.status')}</th>
+            <th scope="col">{t('agent.table.actions')}</th>
           </tr>
         </thead>
         <tbody>

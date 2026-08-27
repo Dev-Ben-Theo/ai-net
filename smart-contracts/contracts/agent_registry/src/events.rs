@@ -246,3 +246,44 @@ pub struct BondReturned {
     /// Bond amount returned in stroops.
     pub amount_stroops: i128,
 }
+
+// ─── Multi-sig Administration Event Data Structs ──────────────────────────────
+
+/// Data payload for `(registry, op_prop)`.
+/// Published when a multi-sig proposal is submitted.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct OperationProposed {
+    pub proposal_id: u64,
+    pub proposer: Address,
+    pub action: Symbol,
+    pub eta: u64,
+    pub expires_at: u64,
+}
+
+/// Data payload for `(registry, op_appr)`.
+/// Published when an admin approves a proposal.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct OperationApproved {
+    pub proposal_id: u64,
+    pub approver: Address,
+}
+
+/// Data payload for `(registry, op_exec)`.
+/// Published when a proposal is executed after timelock.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct OperationExecuted {
+    pub proposal_id: u64,
+    pub executor: Address,
+}
+
+/// Data payload for `(registry, op_canc)`.
+/// Published when a proposal is cancelled by its proposer.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct OperationCancelled {
+    pub proposal_id: u64,
+    pub canceller: Address,
+}

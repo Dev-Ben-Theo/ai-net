@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
 import { getConfig } from "../../config";
+import { adminAuthMiddleware } from "../middleware/auth";
+import { metricsService } from "../../services/metrics";
 import { tracingService } from "../../services/tracing";
 
 const router = Router();
@@ -121,6 +123,82 @@ router.get("/ready", async (_req: Request, res: Response) => {
 
   const allOk = Object.values(checks).every((status) => status === "ok");
   res.status(allOk ? 200 : 500).json({ status: allOk ? "ok" : "error", checks });
+});
+
+/**
+ * @openapi
+ * /health/dashboard:
+ *   get:
+ *     summary: Comprehensive health and metrics dashboard
+ *     operationId: getHealthDashboard
+ *     description: >
+ *       Returns a full system snapshot: HTTP traffic analytics (rate, average /
+ *       p95 / p99 latency, error rate), dependency reachability (SQLite,
+ *       Venice AI, Stellar Horizon, WebSocket), process health (memory, CPU,
+ *       uptime, garbage collection), and domain counters for agents, tasks and
+ *       payments.
+ *
+ *
+ *       The snapshot is cached for `METRICS_CACHE_TTL_MS` (default 5 seconds);
+ *       `cacheAgeMs` reports how stale the served copy is. Pass `?refresh=true`
+ *       to bypass the cache.
+ *
+ *
+ *       Requires the admin API key via `X-Admin-API-Key` or
+ *       `Authorization: Bearer`. Responds 503 when `ADMIN_API_KEY` is unset.
+ *     tags: [Health]
+ *     parameters:
+ *       - in: query
+ *         name: refresh
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: ["true", "false"]
+ *         description: Bypass the metrics cache and collect a fresh snapshot.
+ *     responses:
+ *       200:
+ *         description: Dashboard snapshot
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   enum: [healthy, degraded, unhealthy]
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                 cacheAgeMs:
+ *                   type: number
+ *                 requests:
+ *                   type: object
+ *                 dependencies:
+ *                   type: object
+ *                 system:
+ *                   type: object
+ *                 agents:
+ *                   type: object
+ *                 tasks:
+ *                   type: object
+ *                 payments:
+ *                   type: object
+ *       401:
+ *         description: Missing or invalid admin API key
+ *       503:
+ *         description: ADMIN_API_KEY is not configured
+ */
+router.get("/dashboard", adminAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const dashboard = await metricsService.getDashboard(req.query.refresh === "true");
+    res.json(dashboard);
+  } catch (error) {
+    res.status(500).json({
+      status: "unhealthy",
+      error: "Failed to collect metrics",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
 });
 
 /**

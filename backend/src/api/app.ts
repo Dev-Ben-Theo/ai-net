@@ -12,7 +12,11 @@ import type { AgentRegistry } from "../types/agent";
 import { getTask } from "../coordinator/taskStore";
 import { eventBus } from "../coordinator/eventBus";
 import type { EventStore } from "../events/eventStore";
-import { attachTaskStream, type TaskStreamOptions } from "./routes/stream";
+import {
+  attachTaskStream,
+  getStreamConnectionCount,
+  type TaskStreamOptions,
+} from "./routes/stream";
 import type { DAGNode } from "../types/task";
 import {
   createPaymentReleaseFn,
@@ -36,6 +40,7 @@ import { createV2TasksRouter } from "./routes/v2/tasks";
 import { createLogger } from "../utils/logger";
 import { createTaskDb, getTaskDb } from "../db/tasks";
 import { createHeartbeatService, type HeartbeatServiceOptions } from "../services/heartbeat";
+import { metricsMiddleware, metricsService } from "../services/metrics";
 import { openapiSpec } from "./docs/openapi";
 import { createTaskJobHandler } from "../coordinator/coordinator";
 import {
@@ -117,6 +122,9 @@ export function createApp(opts: AppOptions = {}): {
   app.use(createCorsMiddleware());
   app.use(requestId);
   app.use(requestLogger);
+  // Samples every response into the health dashboard's rolling window. Mounted
+  // before the routers so latency covers the full handler chain.
+  app.use(metricsMiddleware);
   app.use(versioningMiddleware);
 
   // ── Response compression ────────────────────────────────────────────────────
@@ -213,12 +221,23 @@ export function createApp(opts: AppOptions = {}): {
     ...opts.stream,
   });
 
+  // ── Metrics ────────────────────────────────────────────────────────────────
+  // GC is process-global, so the observer is started once and left running for
+  // the lifetime of the process (it is unref'd and never holds the event loop
+  // open). The WebSocket probe is per-app and is cleared on close().
+  metricsService.startGcObserver();
+  metricsService.setWebSocketProbe(() => ({
+    listening: httpServer.listening,
+    connections: getStreamConnectionCount(),
+  }));
+
   // ── Error handler (must be last) ───────────────────────────────────────────
   app.use(errorHandler);
 
   function close(callback?: () => void): void {
     jobWorker.stop();
     heartbeatService.stop();
+    metricsService.setWebSocketProbe(null);
     detachStream();
     httpServer.close(callback);
   }

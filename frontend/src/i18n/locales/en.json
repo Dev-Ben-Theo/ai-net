@@ -247,6 +247,7 @@
   "a11y.breadcrumb": "Breadcrumb",
   "a11y.expandSidebar": "Expand sidebar",
   "a11y.collapseSidebar": "Collapse sidebar",
+  "a11y.sidebar": "Sidebar",
   "a11y.search": "Search",
   "a11y.closeSearch": "Close search",
   "a11y.copyPublicKey": "Copy public key",

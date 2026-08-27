@@ -80,6 +80,23 @@ export interface TaskStreamDeps extends TaskStreamOptions {
 }
 
 /**
+ * Every WebSocketServer currently attached to an HTTP server.
+ *
+ * Tracked so the health dashboard can report live connection counts without
+ * threading a handle through `createApp`.
+ */
+const activeStreamServers = new Set<WebSocketServer>();
+
+/** Total number of clients connected across all attached stream servers. */
+export function getStreamConnectionCount(): number {
+  let total = 0;
+  for (const server of activeStreamServers) {
+    total += server.clients.size;
+  }
+  return total;
+}
+
+/**
  * Attach the live DAG-execution stream to an HTTP server.
  *
  * Exposes ws://<host>/tasks/:id/stream. Each connection:
@@ -110,6 +127,7 @@ export function attachTaskStream(deps: TaskStreamDeps): () => void {
   } = deps;
 
   const wss = new WebSocketServer({ noServer: true });
+  activeStreamServers.add(wss);
 
   const onUpgrade = (req: IncomingMessage, socket: Socket, head: Buffer): void => {
     const match = (req.url ?? '').match(STREAM_PATH);
@@ -241,6 +259,7 @@ export function attachTaskStream(deps: TaskStreamDeps): () => void {
 
   return function detach(): void {
     httpServer.off('upgrade', onUpgrade);
+    activeStreamServers.delete(wss);
     for (const client of wss.clients) {
       client.terminate();
     }
