@@ -6,6 +6,7 @@ import { useWallet } from '../context/WalletContext'
 import { useWalletBalance } from '../hooks/useWalletBalance'
 import { useTransactionHistory } from '../hooks/useTransactionHistory'
 import { SendXLMForm } from '../components/wallet/SendXLMForm'
+import { PaymentChart } from '../components/wallet/PaymentChart'
 import { TransactionTable } from '../components/wallet/TransactionTable'
 import { WalletWizard } from '../components/wallet/WalletWizard'
 import { Skeleton, SkeletonAvatar, SkeletonCard, SkeletonText } from '../components/common/Skeleton'
@@ -351,6 +352,7 @@ function WalletPage() {
           <SendXLMForm />
         </div>
         <div className={styles.historySection}>
+          <PaymentChart transactions={transactions} />
           <TransactionTable
             transactions={transactions}
             loading={txLoading}

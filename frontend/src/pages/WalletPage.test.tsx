@@ -51,14 +51,21 @@ vi.mock('../hooks/useWalletBalance', () => ({
   }),
 }))
 
-vi.mock('../hooks/useTransactionHistory', () => ({
-  useTransactionHistory: () => ({
-    transactions: [],
-    loading: false,
-    error: null,
-    refresh: vi.fn(),
-  }),
-}))
+// Only `useTransactionHistory` (the data-fetching hook) is mocked here - the
+// module also exports pure filtering/aggregation helpers that PaymentChart and
+// TransactionTable call directly, so those must stay the real implementations.
+vi.mock('../hooks/useTransactionHistory', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../hooks/useTransactionHistory')>()
+  return {
+    ...actual,
+    useTransactionHistory: () => ({
+      transactions: [],
+      loading: false,
+      error: null,
+      refresh: vi.fn(),
+    }),
+  }
+})
 
 function renderPage() {
   return render(

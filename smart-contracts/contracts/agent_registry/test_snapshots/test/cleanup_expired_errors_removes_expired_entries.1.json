@@ -8,103 +8,15 @@
     [],
     [
       [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "report_error",
-              "args": [
-                {
-                  "bytes": "0100000000000000000000000000000000000000000000000000000000000000"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                },
-                {
-                  "string": "timeout"
-                }
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [
-      [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "report_error",
-              "args": [
-                {
-                  "bytes": "0200000000000000000000000000000000000000000000000000000000000000"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                },
-                {
-                  "string": "auth"
-                }
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [
-      [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "report_error",
-              "args": [
-                {
-                  "bytes": "0300000000000000000000000000000000000000000000000000000000000000"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                },
-                {
-                  "string": "budget"
-                }
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [
-      [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
         {
           "function": {
             "contract_fn": {
               "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "resolve_errors",
+              "function_name": "set_error_ttl",
               "args": [
                 {
-                  "vec": [
-                    {
-                      "bytes": "0100000000000000000000000000000000000000000000000000000000000000"
-                    },
-                    {
-                      "bytes": "0200000000000000000000000000000000000000000000000000000000000000"
-                    },
-                    {
-                      "bytes": "0300000000000000000000000000000000000000000000000000000000000000"
-                    }
-                  ]
-                },
-                {
-                  "u32": 0
+                  "u64": 50
                 }
               ]
             }
@@ -113,11 +25,63 @@
         }
       ]
     ],
+    [
+      [
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+        {
+          "function": {
+            "contract_fn": {
+              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "function_name": "report_error",
+              "args": [
+                {
+                  "bytes": "5c00000000000000000000000000000000000000000000000000000000000000"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                },
+                {
+                  "string": "old"
+                }
+              ]
+            }
+          },
+          "sub_invocations": []
+        }
+      ]
+    ],
+    [
+      [
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
+        {
+          "function": {
+            "contract_fn": {
+              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "function_name": "report_error",
+              "args": [
+                {
+                  "bytes": "5d00000000000000000000000000000000000000000000000000000000000000"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                },
+                {
+                  "string": "new"
+                }
+              ]
+            }
+          },
+          "sub_invocations": []
+        }
+      ]
+    ],
+    [],
+    [],
     []
   ],
   "ledger": {
     "protocol_version": 22,
-    "sequence_number": 0,
+    "sequence_number": 1060,
     "timestamp": 0,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
@@ -135,7 +99,7 @@
                   "symbol": "ErrorRecord"
                 },
                 {
-                  "bytes": "0100000000000000000000000000000000000000000000000000000000000000"
+                  "bytes": "5d00000000000000000000000000000000000000000000000000000000000000"
                 }
               ]
             },
@@ -155,7 +119,7 @@
                       "symbol": "ErrorRecord"
                     },
                     {
-                      "bytes": "0100000000000000000000000000000000000000000000000000000000000000"
+                      "bytes": "5d00000000000000000000000000000000000000000000000000000000000000"
                     }
                   ]
                 },
@@ -167,7 +131,7 @@
                         "symbol": "created_at"
                       },
                       "val": {
-                        "u64": 0
+                        "u64": 1040
                       }
                     },
                     {
@@ -175,7 +139,7 @@
                         "symbol": "expires_at"
                       },
                       "val": {
-                        "u64": 518400
+                        "u64": 1090
                       }
                     },
                     {
@@ -183,7 +147,7 @@
                         "symbol": "id"
                       },
                       "val": {
-                        "bytes": "0100000000000000000000000000000000000000000000000000000000000000"
+                        "bytes": "5d00000000000000000000000000000000000000000000000000000000000000"
                       }
                     },
                     {
@@ -191,7 +155,7 @@
                         "symbol": "message"
                       },
                       "val": {
-                        "string": "timeout"
+                        "string": "new"
                       }
                     },
                     {
@@ -215,7 +179,7 @@
                         "symbol": "resolved"
                       },
                       "val": {
-                        "bool": true
+                        "bool": false
                       }
                     }
                   ]
@@ -224,211 +188,7 @@
             },
             "ext": "v0"
           },
-          535680
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "ErrorRecord"
-                },
-                {
-                  "bytes": "0200000000000000000000000000000000000000000000000000000000000000"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "ErrorRecord"
-                    },
-                    {
-                      "bytes": "0200000000000000000000000000000000000000000000000000000000000000"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "created_at"
-                      },
-                      "val": {
-                        "u64": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "expires_at"
-                      },
-                      "val": {
-                        "u64": 518400
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "id"
-                      },
-                      "val": {
-                        "bytes": "0200000000000000000000000000000000000000000000000000000000000000"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "message"
-                      },
-                      "val": {
-                        "string": "auth"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "reporter"
-                      },
-                      "val": {
-                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "resolution"
-                      },
-                      "val": {
-                        "u32": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "resolved"
-                      },
-                      "val": {
-                        "bool": true
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          535680
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "ErrorRecord"
-                },
-                {
-                  "bytes": "0300000000000000000000000000000000000000000000000000000000000000"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "ErrorRecord"
-                    },
-                    {
-                      "bytes": "0300000000000000000000000000000000000000000000000000000000000000"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "created_at"
-                      },
-                      "val": {
-                        "u64": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "expires_at"
-                      },
-                      "val": {
-                        "u64": 518400
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "id"
-                      },
-                      "val": {
-                        "bytes": "0300000000000000000000000000000000000000000000000000000000000000"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "message"
-                      },
-                      "val": {
-                        "string": "budget"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "reporter"
-                      },
-                      "val": {
-                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "resolution"
-                      },
-                      "val": {
-                        "u32": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "resolved"
-                      },
-                      "val": {
-                        "bool": true
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          535680
+          536720
         ]
       ],
       [
@@ -470,6 +230,18 @@
                         "key": {
                           "vec": [
                             {
+                              "symbol": "ErrorTTL"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u64": 50
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
                               "symbol": "Paused"
                             }
                           ]
@@ -494,7 +266,7 @@
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
             "key": {
               "ledger_key_nonce": {
-                "nonce": 4837995959683129791
+                "nonce": 801925984706572462
               }
             },
             "durability": "temporary"
@@ -509,39 +281,6 @@
                 "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
                 "key": {
                   "ledger_key_nonce": {
-                    "nonce": 4837995959683129791
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": 801925984706572462
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-                "key": {
-                  "ledger_key_nonce": {
                     "nonce": 801925984706572462
                   }
                 },
@@ -551,7 +290,7 @@
             },
             "ext": "v0"
           },
-          6311999
+          6312999
         ]
       ],
       [
@@ -584,7 +323,7 @@
             },
             "ext": "v0"
           },
-          6311999
+          6313039
         ]
       ],
       [
@@ -617,7 +356,7 @@
             },
             "ext": "v0"
           },
-          6311999
+          6312999
         ]
       ],
       [
