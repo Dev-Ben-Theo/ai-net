@@ -80,6 +80,10 @@ pub const GAS_RESOLVE_ERROR_MARGINAL: u64 = 30_000;
 pub const GAS_SLASH_BOND: u64 = 60_000;
 /// Full cost of a `deregister_agent` that also returns a bond.
 pub const GAS_DEREGISTER_WITH_BOND: u64 = 80_000;
+/// Full cost of checking/removing a single expired error (includes overhead).
+pub const GAS_CLEANUP_ERROR: u64 = 20_000;
+/// Marginal cost of each additional error checked in a cleanup batch.
+pub const GAS_CLEANUP_ERROR_MARGINAL: u64 = 10_000;
 
 /// Default minimum bond required to register an agent, in stroops.
 /// 10 XLM = 100_000_000 stroops.  Admin can override via `set_min_bond`.
@@ -92,6 +96,10 @@ pub const BOND_COOLDOWN_LEDGERS: u32 = 17_280;
 pub const TTL_THRESHOLD: u32 = 100_000;
 /// Target TTL after extension (~31 days at 5s ledgers: 535_680).
 pub const TTL_EXTEND_TO: u32 = 535_680;
+
+/// Default error entry retention, in ledger sequences (~30 days at 5s/ledger).
+/// Overridable via `set_error_ttl`.
+pub const DEFAULT_ERROR_TTL: u64 = 518_400;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -159,6 +167,10 @@ pub struct ErrorEntry {
     pub message: String,
     pub resolved: bool,
     pub resolution: Resolution,
+    /// Ledger sequence at which this entry was created.
+    pub created_at: u64,
+    /// Ledger sequence at/after which this entry is eligible for cleanup.
+    pub expires_at: u64,
 }
 
 /// Empirical gas budget parameters (instance storage).
@@ -172,6 +184,8 @@ pub struct GasConfig {
     pub resolve_error_marginal: u64,
     pub slash_bond: u64,
     pub deregister_with_bond: u64,
+    pub cleanup_error: u64,
+    pub cleanup_error_marginal: u64,
 }
 
 impl GasConfig {
@@ -184,6 +198,8 @@ impl GasConfig {
             resolve_error_marginal: GAS_RESOLVE_ERROR_MARGINAL,
             slash_bond: GAS_SLASH_BOND,
             deregister_with_bond: GAS_DEREGISTER_WITH_BOND,
+            cleanup_error: GAS_CLEANUP_ERROR,
+            cleanup_error_marginal: GAS_CLEANUP_ERROR_MARGINAL,
         }
     }
 }
@@ -206,6 +222,8 @@ pub enum DataKey {
     FrozenAgent(Symbol),
     ErrorRecord(BytesN<32>),
     GasConfig,
+    /// Configurable TTL (in ledger sequences) applied to new error entries.
+    ErrorTTL,
     /// Minimum bond required for registration, in stroops (instance storage).
     MinBond,
     /// Ledger number at which the cooldown expires for a deregistering agent.
@@ -252,6 +270,13 @@ fn gas_config(env: &Env) -> GasConfig {
         .instance()
         .get(&DataKey::GasConfig)
         .unwrap_or_else(GasConfig::default_config)
+}
+
+fn error_ttl(env: &Env) -> u64 {
+    env.storage()
+        .instance()
+        .get(&DataKey::ErrorTTL)
+        .unwrap_or(DEFAULT_ERROR_TTL)
 }
 
 fn get_storage_config_internal(env: &Env) -> StorageConfig {
@@ -1528,6 +1553,7 @@ impl AgentRegistryContract {
             return Err(Error::AlreadyExists);
         }
 
+        let created_at = env.ledger().sequence() as u64;
         let entry = ErrorEntry {
             id: error_id.clone(),
             reporter: reporter.clone(),
@@ -1535,6 +1561,8 @@ impl AgentRegistryContract {
             resolved: false,
             // Placeholder until resolve_errors overwrites with a real resolution.
             resolution: Resolution::Fixed,
+            created_at,
+            expires_at: created_at + error_ttl(&env),
         };
         env.storage().persistent().set(&key, &entry);
         extend_ttl_for_key(&env, &key);
@@ -1547,6 +1575,47 @@ impl AgentRegistryContract {
         );
 
         Ok(())
+    }
+
+    /// Configure how many ledger sequences newly reported errors live for
+    /// before becoming eligible for `cleanup_expired_errors`.
+    pub fn set_error_ttl(env: Env, ttl_ledgers: u64) -> Result<(), Error> {
+        require_admin(&env)?;
+        env.storage()
+            .instance()
+            .set(&DataKey::ErrorTTL, &ttl_ledgers);
+        Ok(())
+    }
+
+    /// Read the currently configured error retention (defaults if never set).
+    pub fn get_error_ttl(env: Env) -> u64 {
+        error_ttl(&env)
+    }
+
+    /// Remove expired error entries from persistent storage.
+    ///
+    /// Soroban has no iterator over all contract keys, so callers pass the
+    /// set of error ids to check (e.g. from off-chain indexing of
+    /// `report_error` events). Permissionless: anyone can pay to garbage
+    /// collect entries that are already past their `expires_at`, unresolved
+    /// or not. Returns the number of entries actually removed.
+    pub fn cleanup_expired_errors(env: Env, error_ids: Vec<BytesN<32>>) -> u32 {
+        let current_seq = env.ledger().sequence() as u64;
+        let mut removed = 0u32;
+
+        for i in 0..error_ids.len() {
+            let id = error_ids.get(i).unwrap();
+            let key = DataKey::ErrorRecord(id);
+            let entry: Option<ErrorEntry> = env.storage().persistent().get(&key);
+            if let Some(entry) = entry {
+                if entry.expires_at <= current_seq {
+                    env.storage().persistent().remove(&key);
+                    removed += 1;
+                }
+            }
+        }
+
+        removed
     }
 
     /// Resolve multiple errors in one transaction (atomic all-or-nothing).
@@ -1621,10 +1690,14 @@ impl AgentRegistryContract {
     }
 
     /// Fetch a single error entry (for tests / off-chain indexing).
+    /// Extends the entry's storage TTL on access, like agent records.
     pub fn get_error(env: Env, error_id: BytesN<32>) -> Option<ErrorEntry> {
-        env.storage()
-            .persistent()
-            .get(&DataKey::ErrorRecord(error_id))
+        let key = DataKey::ErrorRecord(error_id);
+        let entry = env.storage().persistent().get(&key);
+        if entry.is_some() {
+            extend_ttl_for_key(&env, &key);
+        }
+        entry
     }
 
     // ── Gas budget estimation ────────────────────────────────────────────────
@@ -1634,6 +1707,7 @@ impl AgentRegistryContract {
     /// `operation` is one of:
     /// - `"register_agent"` / `"register_agents"`
     /// - `"resolve_error"` / `"resolve_errors"`
+    /// - `"cleanup_expired_errors"`
     ///
     /// Returns `0` for unknown operations. Values come from [`GasConfig`]
     /// (defaults match the tables in `docs/gas_costs.md`).
@@ -1653,6 +1727,7 @@ impl AgentRegistryContract {
         let resolve_errors = String::from_str(&env, "resolve_errors");
         let slash_bond_op = String::from_str(&env, "slash_bond");
         let deregister_bond_op = String::from_str(&env, "deregister_with_bond");
+        let cleanup_expired_errors = String::from_str(&env, "cleanup_expired_errors");
 
         if operation == register_agent || operation == register_agents {
             // First item pays full single-call cost; rest pay marginal.
@@ -1664,6 +1739,11 @@ impl AgentRegistryContract {
             cfg.resolve_error
                 + cfg
                     .resolve_error_marginal
+                    .saturating_mul((count - 1) as u64)
+        } else if operation == cleanup_expired_errors {
+            cfg.cleanup_error
+                + cfg
+                    .cleanup_error_marginal
                     .saturating_mul((count - 1) as u64)
         } else if operation == slash_bond_op {
             cfg.slash_bond.saturating_mul(count as u64)
