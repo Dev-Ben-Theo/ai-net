@@ -159,6 +159,7 @@ export function attachTaskStream(deps: TaskStreamDeps): () => void {
   } = deps;
 
   const wss = new WebSocketServer({ noServer: true });
+  activeStreamServers.add(wss);
 
   const onUpgrade = (req: IncomingMessage, socket: Socket, head: Buffer): void => {
     const match = (req.url ?? '').match(STREAM_PATH);
@@ -290,6 +291,7 @@ export function attachTaskStream(deps: TaskStreamDeps): () => void {
 
   return function detach(): void {
     httpServer.off('upgrade', onUpgrade);
+    activeStreamServers.delete(wss);
     for (const client of wss.clients) {
       client.terminate();
     }

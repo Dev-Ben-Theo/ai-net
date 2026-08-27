@@ -8,7 +8,6 @@ const mockConnect = vi.fn()
 const mockDisconnect = vi.fn()
 const mockConnectFreighter = vi.fn()
 
-// Mock wallet state - will be overridden per test via mutable object
 let mockWalletState: {
   publicKey: string | null
   keypair: any
@@ -20,7 +19,6 @@ let mockWalletState: {
   connectFreighter: typeof mockConnectFreighter
   disconnect: typeof mockDisconnect
   hasCompletedWizard: boolean
-  completeWizard: typeof vi.fn
 } = {
   publicKey: null as string | null,
   keypair: null as any,
@@ -32,7 +30,6 @@ let mockWalletState: {
   connectFreighter: mockConnectFreighter,
   disconnect: mockDisconnect,
   hasCompletedWizard: true,
-  completeWizard: vi.fn(),
 }
 
 vi.mock('../context/WalletContext', () => ({
@@ -54,14 +51,21 @@ vi.mock('../hooks/useWalletBalance', () => ({
   }),
 }))
 
-vi.mock('../hooks/useTransactionHistory', () => ({
-  useTransactionHistory: () => ({
-    transactions: [],
-    loading: false,
-    error: null,
-    refresh: vi.fn(),
-  }),
-}))
+// Only `useTransactionHistory` (the data-fetching hook) is mocked here - the
+// module also exports pure filtering/aggregation helpers that PaymentChart and
+// TransactionTable call directly, so those must stay the real implementations.
+vi.mock('../hooks/useTransactionHistory', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../hooks/useTransactionHistory')>()
+  return {
+    ...actual,
+    useTransactionHistory: () => ({
+      transactions: [],
+      loading: false,
+      error: null,
+      refresh: vi.fn(),
+    }),
+  }
+})
 
 function renderPage() {
   return render(
@@ -85,7 +89,6 @@ beforeEach(() => {
     connectFreighter: mockConnectFreighter,
     disconnect: mockDisconnect,
     hasCompletedWizard: true,
-    completeWizard: vi.fn(),
   }
 })
 
@@ -134,7 +137,6 @@ describe('WalletPage - Connected State', () => {
       connectFreighter: mockConnectFreighter,
       disconnect: mockDisconnect,
       hasCompletedWizard: true,
-      completeWizard: vi.fn(),
     }
   })
 
@@ -207,7 +209,6 @@ describe('SendXLMForm Validation', () => {
       connectFreighter: mockConnectFreighter,
       disconnect: mockDisconnect,
       hasCompletedWizard: true,
-      completeWizard: vi.fn(),
     }
   })
 

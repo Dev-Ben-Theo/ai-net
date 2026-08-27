@@ -71,6 +71,10 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
   return (
     <div className="app-shell">
+      <a href="#main-content" className="skip-to-content">
+        Skip to content
+      </a>
+
       <TopNav 
         onMenuClick={toggleDrawer}
         onToggleSidebar={toggleSidebar}
@@ -101,7 +105,11 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
         )}
       </AnimatePresence>
 
-      <main className={`main-content ${!isMobile && sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <main
+        id="main-content"
+        className={`main-content ${!isMobile && sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+        tabIndex={-1}
+      >
         <Breadcrumb />
         {children}
       </main>

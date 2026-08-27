@@ -107,10 +107,12 @@ jobs:
           cache: npm
           cache-dependency-path: smart-contracts/package-lock.json
 
-      - name: Install Rust toolchain
+      - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
+          # The Soroban contracts build for this target (see "Cargo build"
+          # below); installing the target is what makes `cargo build` work.
           targets: wasm32v1-none
 
       - name: Cache Rust build

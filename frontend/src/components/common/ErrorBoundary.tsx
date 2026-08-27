@@ -18,22 +18,26 @@ function ErrorFallback({ errorCode }: { errorCode: string | null }) {
   const { t } = useTranslation();
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '400px',
-      padding: '40px',
-      textAlign: 'center',
-      background: 'var(--panel-bg, rgba(30, 41, 59, 0.7))',
-      backdropFilter: 'blur(12px)',
-      border: '1px solid var(--panel-border, rgba(255, 255, 255, 0.08))',
-      borderRadius: '16px',
-      margin: '40px auto',
-      maxWidth: '600px',
-      boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
-    }}>
+    <div
+      role="alert"
+      aria-live="assertive"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '400px',
+        padding: '40px',
+        textAlign: 'center',
+        background: 'var(--panel-bg, rgba(30, 41, 59, 0.7))',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid var(--panel-border, rgba(255, 255, 255, 0.08))',
+        borderRadius: '16px',
+        margin: '40px auto',
+        maxWidth: '600px',
+        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
+      }}
+    >
       <h2 style={{ color: 'var(--danger, #ef4444)', marginBottom: '16px', fontSize: '1.8rem' }}>
         {t('error.title')}
       </h2>
