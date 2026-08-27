@@ -45,10 +45,9 @@ use events::{
     OperationProposed, RegistryInitializedEvent,
 };
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, xdr::ToXdr, Address, BytesN, Env, Map,
-    String, Symbol, Val, Vec,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Map, String, Symbol,
+    Val, Vec,
 };
-pub use types::Attestation;
 
 /// Default timelock delay in seconds (24 hours = 86,400 seconds).
 pub const DEFAULT_TIMELOCK_DELAY: u64 = 86_400;
