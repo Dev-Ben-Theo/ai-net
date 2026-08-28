@@ -50,11 +50,25 @@ export interface ComponentNode {
   children?: ComponentNode[];
 }
 
+export interface DesignImage {
+  url?: string;
+  src?: string;
+  image?: string;
+  name?: string;
+  title?: string;
+  alt?: string;
+  description?: string;
+  type?: string;
+}
+
 export interface DesignResultObj {
   colors?: string[] | DesignColor[];
   palette?: string[] | DesignColor[];
   components?: ComponentNode;
   hierarchy?: ComponentNode;
+  images?: string[] | DesignImage[];
+  mockups?: string[] | DesignImage[];
+  wireframes?: string[] | DesignImage[];
 }
 
 export type DesignResult = DesignResultObj;
@@ -66,3 +80,21 @@ export type AgentResult =
   | DesignResult
   | null
   | undefined;
+
+export interface ReputationDimensions {
+  quality: number;
+  speed: number;
+  reliability: number;
+  cost: number;
+}
+
+export interface ReputationHistory {
+  date: string;
+  score: number;
+}
+
+export interface AgentReputation {
+  id: string;
+  dimensions: ReputationDimensions;
+  history: ReputationHistory[];
+}

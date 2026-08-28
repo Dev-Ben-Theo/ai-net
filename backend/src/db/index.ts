@@ -1,7 +1,8 @@
 import Database from "better-sqlite3";
 import path from "path";
+import { createLogger } from "../utils/logger";
 
-export type PaymentStatus = "pending" | "locked" | "released" | "refunded";
+export type PaymentStatus = "locked" | "released" | "refunded";
 
 export interface PaymentRecord {
   taskId: string;
@@ -12,12 +13,23 @@ export interface PaymentRecord {
   txHash: string | null;
 }
 
+const logger = createLogger({ component: "payment-db" });
+
 let _db: Database.Database | null = null;
 
 export function getDb(dbPath?: string): Database.Database {
   if (!_db) {
     const filePath = dbPath ?? path.join(process.cwd(), "payments.db");
-    _db = new Database(filePath);
+    _db = new Database(filePath as unknown as string);
+    _db.pragma("busy_timeout = 5000");
+    _db.pragma("journal_mode = WAL");
+    logger.info({ dbPath: filePath }, "payment database opened");
+    (_db as unknown as { on: (event: string, fn: (error: Error) => void) => void }).on(
+      "error",
+      (error: Error) => {
+        logger.error({ err: error }, "payment database error");
+      },
+    );
     _db.exec(`
       CREATE TABLE IF NOT EXISTS payments (
         taskId       TEXT NOT NULL,
@@ -38,10 +50,23 @@ export function closeDb(): void {
   _db = null;
 }
 
+export function paymentDbHealthCheck(): boolean {
+  try {
+    const db = getDb();
+    db.prepare("SELECT 1").get();
+    return true;
+  } catch (error) {
+    logger.error({ err: error }, "payment database health check failed");
+    return false;
+  }
+}
+
 export interface PaymentDb {
   insert(record: PaymentRecord): void;
   findByKey(taskId: string, nodeId: string): PaymentRecord | undefined;
-  updateStatus(taskId: string, nodeId: string, status: PaymentStatus, txHash: string | null): void;
+  updateStatus(taskId: string, nodeId: string, status: PaymentStatus, txHash: string): void;
+  /** All payment records — used by payment reconciliation. */
+  listAll(): PaymentRecord[];
 }
 
 export function createPaymentDb(db: Database.Database): PaymentDb {
@@ -72,10 +97,22 @@ export function createPaymentDb(db: Database.Database): PaymentDb {
       };
     },
 
-    updateStatus(taskId: string, nodeId: string, status: PaymentStatus, txHash: string | null): void {
+    updateStatus(taskId: string, nodeId: string, status: PaymentStatus, txHash: string): void {
       db.prepare(
         "UPDATE payments SET status = ?, txHash = ? WHERE taskId = ? AND nodeId = ?"
       ).run(status, txHash, taskId, nodeId);
+    },
+
+    listAll(): PaymentRecord[] {
+      const rows = db.prepare("SELECT * FROM payments").all() as Array<Record<string, unknown>>;
+      return rows.map((row) => ({
+        taskId: row.taskId as string,
+        nodeId: row.nodeId as string,
+        balanceId: row.balanceId as string,
+        status: row.status as PaymentStatus,
+        amountStroops: BigInt(row.amountStroops as string),
+        txHash: row.txHash as string | null,
+      }));
     },
   };
 }

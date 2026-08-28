@@ -15,6 +15,7 @@ import {
   xlmToStroops,
   stroopsToXlm,
 } from "./utils";
+import { tracingService } from "../services/tracing";
 
 const STELLAR_HORIZON =
   process.env.STELLAR_HORIZON ?? "https://horizon-testnet.stellar.org";
@@ -55,11 +56,29 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+export interface PaymentServiceHooks {
+  /**
+   * Invoked after a payment is successfully released on-chain so callers can
+   * trigger a reconciliation check (e.g. `ReconciliationService.run('release')`).
+   */
+  reconciliationHook?: (record: PaymentRecord) => void;
+}
+
 export class PaymentService {
   private server: Server;
 
-  constructor(private db: PaymentDb) {
+  constructor(
+    private db: PaymentDb,
+    private hooks: PaymentServiceHooks = {}
+  ) {
     this.server = new Server(STELLAR_HORIZON);
+  }
+
+  /**
+   * Enumerate all local payment records — the reconciliation source of truth.
+   */
+  listLocalRecords(): PaymentRecord[] {
+    return this.db.listAll();
   }
 
   async lock(
@@ -67,62 +86,67 @@ export class PaymentService {
     nodeId: string,
     coordinatorKeypair: Keypair,
     agentPublicKey: string,
-    amountXLM: number
+    amountXLM: number,
+    correlationId?: string
   ): Promise<string> {
-    const amountStroops = xlmToStroops(amountXLM);
-    const amountStr = stroopsToXlm(amountStroops);
+    const span = correlationId
+      ? tracingService.startSpan(correlationId, 'payment', 'lock', { taskId, nodeId, amountXLM })
+      : null;
 
-    const account = await withRetry(() =>
-      this.server.loadAccount(coordinatorKeypair.publicKey())
-    );
+    try {
+      const amountStroops = xlmToStroops(amountXLM);
+      const amountStr = stroopsToXlm(amountStroops);
 
-    const tx = new TransactionBuilder(account, {
-      fee: BASE_FEE,
-      networkPassphrase: STELLAR_NETWORK,
-    })
-      .addOperation(
-        Operation.createClaimableBalance({
-          asset: Asset.native(),
-          amount: amountStr,
-          claimants: [
-            new Claimant(agentPublicKey, Claimant.predicateUnconditional()),
-            new Claimant(coordinatorKeypair.publicKey(), Claimant.predicateUnconditional()),
-          ],
-        })
-      )
-      .setTimeout(30)
-      .build();
+      const account = await withRetry(() =>
+        this.server.loadAccount(coordinatorKeypair.publicKey())
+      );
 
-    // Derive balance ID before signing — deterministic from the operation
-    const balanceId = tx.getClaimableBalanceId(0);
+      const tx = new TransactionBuilder(account, {
+        fee: BASE_FEE,
+        networkPassphrase: STELLAR_NETWORK,
+      })
+        .addOperation(
+          Operation.createClaimableBalance({
+            asset: Asset.native(),
+            amount: amountStr,
+            claimants: [
+              new Claimant(agentPublicKey, Claimant.predicateUnconditional()),
+              new Claimant(coordinatorKeypair.publicKey(), Claimant.predicateUnconditional()),
+            ],
+          })
+        )
+        .setTimeout(30)
+        .build();
 
-    // Pre-write a pending record BEFORE submitting to Stellar.
-    // If the DB write fails here, no funds are moved — safe to retry.
-    // If the Stellar submit fails, the pending record is a no-op and can be
-    // cleaned up on next attempt. This prevents funds being stranded when the
-    // submit succeeds but the subsequent DB write would have failed.
-    this.db.insert({
-      taskId,
-      nodeId,
-      balanceId,
-      status: "pending",
-      amountStroops,
-      txHash: null,
-    });
+      // Derive balance ID before signing — deterministic from the operation
+      const balanceId = tx.getClaimableBalanceId(0);
 
-    tx.sign(coordinatorKeypair);
+      tx.sign(coordinatorKeypair);
 
-    await withRetry(() => this.server.submitTransaction(tx));
+      await withRetry(() => this.server.submitTransaction(tx));
 
-    this.db.updateStatus(taskId, nodeId, "locked", null);
+      this.db.insert({
+        taskId,
+        nodeId,
+        balanceId,
+        status: "locked",
+        amountStroops,
+        txHash: null,
+      });
 
-    return balanceId;
+      if (span) tracingService.endSpan(span.spanId, 'completed', { balanceId });
+      return balanceId;
+    } catch (err) {
+      if (span) tracingService.endSpan(span.spanId, 'failed', { error: String(err) });
+      throw err;
+    }
   }
 
   async release(
     taskId: string,
     nodeId: string,
-    coordinatorKeypair: Keypair
+    coordinatorKeypair: Keypair,
+    correlationId?: string
   ): Promise<string> {
     const record = this.db.findByKey(taskId, nodeId);
     if (!record) throw new Error(`No payment record for task=${taskId} node=${nodeId}`);
@@ -132,27 +156,44 @@ export class PaymentService {
       return record.txHash;
     }
 
-    const account = await withRetry(() =>
-      this.server.loadAccount(coordinatorKeypair.publicKey())
-    );
+    const span = correlationId
+      ? tracingService.startSpan(correlationId, 'payment', 'release', { taskId, nodeId })
+      : null;
 
-    const tx = new TransactionBuilder(account, {
-      fee: BASE_FEE,
-      networkPassphrase: STELLAR_NETWORK,
-    })
-      .addOperation(
-        Operation.claimClaimableBalance({ balanceId: record.balanceId })
-      )
-      .setTimeout(30)
-      .build();
+    try {
+      const account = await withRetry(() =>
+        this.server.loadAccount(coordinatorKeypair.publicKey())
+      );
 
-    tx.sign(coordinatorKeypair);
+      const tx = new TransactionBuilder(account, {
+        fee: BASE_FEE,
+        networkPassphrase: STELLAR_NETWORK,
+      })
+        .addOperation(
+          Operation.claimClaimableBalance({ balanceId: record.balanceId })
+        )
+        .setTimeout(30)
+        .build();
 
-    const result = await withRetry(() => this.server.submitTransaction(tx));
-    const txHash = (result as unknown as { hash: string }).hash;
+      tx.sign(coordinatorKeypair);
 
-    this.db.updateStatus(taskId, nodeId, "released", txHash);
-    return txHash;
+      const result = await withRetry(() => this.server.submitTransaction(tx));
+      const txHash = (result as unknown as { hash: string }).hash;
+
+      this.db.updateStatus(taskId, nodeId, "released", txHash);
+
+      this.hooks.reconciliationHook?.({
+        ...record,
+        status: "released",
+        txHash,
+      });
+
+      if (span) tracingService.endSpan(span.spanId, 'completed', { txHash });
+      return txHash;
+    } catch (err) {
+      if (span) tracingService.endSpan(span.spanId, 'failed', { error: String(err) });
+      throw err;
+    }
   }
 
   async refund(
@@ -165,11 +206,6 @@ export class PaymentService {
 
     if (record.status === "released") {
       throw new PaymentAlreadyReleasedError(taskId, nodeId);
-    }
-
-    // Idempotency: if already refunded, return existing hash without a second Stellar tx
-    if (record.status === "refunded" && record.txHash) {
-      return record.txHash;
     }
 
     const account = await withRetry(() =>

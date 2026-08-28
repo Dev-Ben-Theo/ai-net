@@ -1,14 +1,17 @@
-// src/hooks/useWallet.ts
-import { useEffect, useState } from 'react';
+import { useWallet as useWalletContext } from '../context/WalletContext';
 
-/** Simple wallet hook – reads wallet address from localStorage (key: "walletAddress"). */
 export const useWallet = () => {
-  const [address, setAddress] = useState<string | null>(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem('walletAddress');
-    if (stored) setAddress(stored);
-  }, []);
-
-  return { address };
+  const { publicKey, keypair, connected, ready, connectionMethod, freighterAvailable, connect, connectFreighter, disconnect } = useWalletContext();
+  return {
+    address: publicKey,
+    publicKey,
+    keypair,
+    connected,
+    ready,
+    connectionMethod,
+    freighterAvailable,
+    connect,
+    connectFreighter,
+    disconnect,
+  };
 };
