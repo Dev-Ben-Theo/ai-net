@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { DAGPreview } from './DAGPreview';
 import { useTaskSubmit } from '../../hooks/useTaskSubmit';
+import { useToast } from '../../hooks/useToast';
 import { useToast } from '../../context/ToastContext';
 import type { AgentPreference, TaskSubmitResponse } from '../../services/taskService';
 
@@ -39,6 +40,9 @@ type TaskFormValues = z.infer<ReturnType<typeof makeTaskSchema>>;
 export function TaskSubmissionForm() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { showToast } = useToast();
+  const [preview, setPreview] = useState<TaskSubmitResponse['dagPreview'] | null>(null);
+  const { submitTask, status, data } = useTaskSubmit();
   const [preview, setPreview] = useState<TaskSubmitResponse['dagPreview'] | null>(null);
   const { submitTask, status, error, data } = useTaskSubmit();
   const { showToast } = useToast();
