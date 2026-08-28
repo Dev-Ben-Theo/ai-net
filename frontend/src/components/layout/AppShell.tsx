@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
+import { useMediaQuery } from '../../hooks/useMediaQuery'
 import Sidebar from './Sidebar'
 import TopNav from './TopNav'
 import MobileDrawer from './MobileDrawer'
@@ -12,7 +13,7 @@ interface AppShellProps {
 }
 
 const AppShell: React.FC<AppShellProps> = ({ children }) => {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const isMobile = useMediaQuery('(max-width: 767px)')
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     localStorage.getItem('sidebar_collapsed') === 'true'
@@ -22,20 +23,18 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const drawerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768)
-      if (window.innerWidth >= 768) {
-        setIsDrawerOpen(false)
-      }
+    if (isMobile === false) {
+      setIsDrawerOpen(false)
     }
-
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
+  }, [isMobile])
 
   useEffect(() => {
     localStorage.setItem('sidebar_collapsed', sidebarCollapsed.toString())
   }, [sidebarCollapsed])
+
+  useEffect(() => {
+    setIsDrawerOpen(false)
+  }, [location.pathname])
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

@@ -13,7 +13,9 @@ dependencies = [
 name = "agent-registry"
 version = "0.1.0"
 dependencies = [
+ "ed25519-dalek",
  "error-resolver",
+ "rand_core",
  "soroban-sdk",
  "tokio",
 ]
