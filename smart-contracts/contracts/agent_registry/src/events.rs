@@ -258,3 +258,72 @@ pub struct DiscoveryQueryEvent {
     /// Number of matching agents discovered and ranked.
     pub matches_count: u32,
 }
+
+// ─── Analytics Event Data Structs ────────────────────────────────────────────
+
+/// Data payload for `(registry, analytics_rec)`.
+/// Published when task completion is recorded for an agent.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct AnalyticsRecordedEvent {
+    /// Agent whose analytics were updated.
+    pub agent_id: Symbol,
+    /// Whether the task was successful.
+    pub success: bool,
+    /// Response time for this task in milliseconds.
+    pub response_time: u32,
+    /// Earnings from this task in stroops.
+    pub earnings: i128,
+}
+
+/// Data payload for `(registry, lb_upd)`.
+/// Published when the leaderboard is updated.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct LeaderboardUpdatedEvent {
+    /// Metric used for ranking.
+    pub metric: Symbol,
+    /// Top N agents returned.
+    pub top_count: u32,
+}
+
+// ─── SLA Event Data Structs ──────────────────────────────────────────────────
+
+/// Data payload for `(registry, sla_set)`.
+/// Published when an agent's SLA is configured.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct SlaSetEvent {
+    /// Agent the SLA was set for.
+    pub agent_id: Symbol,
+    /// Maximum response time in milliseconds.
+    pub max_response_time: u32,
+    /// Minimum uptime percentage.
+    pub min_uptime: u32,
+    /// Minimum quality score.
+    pub min_quality_score: u32,
+}
+
+/// Data payload for `(registry, sla_viol)`.
+/// Published when an SLA violation is detected.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct SlaViolationDetectedEvent {
+    /// Agent that violated the SLA.
+    pub agent_id: Symbol,
+    /// Type of violation: 0 = response_time, 1 = uptime, 2 = quality.
+    pub violation_type: u32,
+    /// Penalty applied (stroops).
+    pub penalty_stroops: i128,
+}
+
+/// Data payload for `(registry, sla_bonus)`.
+/// Published when an agent receives a bonus for exceeding SLA.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct SlaBonusAwardedEvent {
+    /// Agent that received the bonus.
+    pub agent_id: Symbol,
+    /// Reputation boost awarded.
+    pub reputation_boost: u32,
+}

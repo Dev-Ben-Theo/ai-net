@@ -43,6 +43,14 @@ pub enum Error {
     StorageLimitReached = 21,
     /// Storage limit reached for capability index.
     CapabilityLimitReached = 22,
+    /// SLA already set for this agent.
+    SlaAlreadyExists = 23,
+    /// SLA not found for this agent.
+    SlaNotFound = 24,
+    /// Agent is in violation of its SLA.
+    SlaViolation = 25,
+    /// Invalid SLA parameters.
+    InvalidSla = 26,
 }
 
 impl Error {
@@ -71,6 +79,10 @@ impl Error {
             20 => Some(Error::InvalidSigner),
             21 => Some(Error::StorageLimitReached),
             22 => Some(Error::CapabilityLimitReached),
+            23 => Some(Error::SlaAlreadyExists),
+            24 => Some(Error::SlaNotFound),
+            25 => Some(Error::SlaViolation),
+            26 => Some(Error::InvalidSla),
             _ => None,
         }
     }

@@ -42,7 +42,8 @@ pub use types::*;
 use events::{
     AdminChangedEvent, AgentDeregisteredEvent, AgentRegisteredEvent, ErrorReportedEvent,
     ErrorResolvedEvent, OperationApproved, OperationCancelled, OperationExecuted,
-    OperationProposed, RegistryInitializedEvent,
+    OperationProposed, RegistryInitializedEvent, AnalyticsRecordedEvent,
+    LeaderboardUpdatedEvent, SlaSetEvent, SlaViolationDetectedEvent, SlaBonusAwardedEvent,
 };
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Map, String, Symbol,
@@ -100,6 +101,15 @@ pub const TTL_EXTEND_TO: u32 = 535_680;
 /// Default error entry retention, in ledger sequences (~30 days at 5s/ledger).
 /// Overridable via `set_error_ttl`.
 pub const DEFAULT_ERROR_TTL: u64 = 518_400;
+
+/// Default analytics snapshot retention (30 days).
+pub const ANALYTICS_SNAPSHOT_RETENTION: u32 = 30;
+
+/// SLA penalty bond slash percentage (10% of bond).
+pub const SLA_PENALTY_PERCENT: i128 = 10;
+
+/// SLA bonus reputation boost (5 points).
+pub const SLA_BONUS_REPUTATION_BOOST: u32 = 5;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -236,6 +246,13 @@ pub enum DataKey {
     TotalAgents,
     DiscoveryCache(DiscoveryQuery),
     DiscoveryStats,
+    // Analytics keys
+    AgentAnalytics(Symbol),
+    AnalyticsSnapshot(Symbol, u64),
+    // SLA keys
+    AgentSla(Symbol),
+    SlaViolation(Symbol, u64),
+    SlaViolationCount(Symbol),
 }
 
 /// Per-item outcome for batch registration (`Ok(agent_id)` / `Err(code)`).
@@ -1789,6 +1806,359 @@ impl AgentRegistryContract {
             .instance()
             .extend_ttl(TTL_THRESHOLD, TTL_EXTEND_TO);
         Ok(())
+    }
+
+    // ── On-Chain Analytics ──────────────────────────────────────────────────
+
+    /// Record task completion for an agent's analytics.
+    pub fn record_task_completion(
+        env: Env,
+        agent_id: Symbol,
+        success: bool,
+        response_time: u32,
+        earnings: i128,
+    ) -> Result<(), Error> {
+        let key = DataKey::AgentAnalytics(agent_id.clone());
+        let mut analytics: AgentAnalytics = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or(AgentAnalytics {
+                agent_id: agent_id.clone(),
+                total_tasks: 0,
+                successful_tasks: 0,
+                failed_tasks: 0,
+                total_earnings: 0,
+                avg_response_time: 0,
+                last_updated: env.ledger().sequence() as u64,
+            });
+
+        let old_total = analytics.total_tasks;
+        analytics.total_tasks += 1;
+        if success {
+            analytics.successful_tasks += 1;
+        } else {
+            analytics.failed_tasks += 1;
+        }
+        analytics.total_earnings += earnings;
+
+        // Running average response time
+        analytics.avg_response_time = if analytics.total_tasks == 1 {
+            response_time
+        } else {
+            ((analytics.avg_response_time as u64 * old_total + response_time as u64)
+                / analytics.total_tasks) as u32
+        };
+
+        analytics.last_updated = env.ledger().sequence() as u64;
+        env.storage().persistent().set(&key, &analytics);
+        extend_ttl_for_key(&env, &key);
+
+        // Store daily snapshot (last 30 days)
+        let snapshot_date = env.ledger().sequence() as u64;
+        let snapshot = AnalyticsSnapshot {
+            snapshot_date,
+            total_tasks: analytics.total_tasks,
+            successful_tasks: analytics.successful_tasks,
+            total_earnings: analytics.total_earnings,
+        };
+        let snap_key = DataKey::AnalyticsSnapshot(agent_id.clone(), snapshot_date);
+        env.storage().persistent().set(&snap_key, &snapshot);
+        extend_ttl_for_key(&env, &snap_key);
+
+        env.events().publish(
+            (symbol_short!("registry"), symbol_short!("anl_rec")),
+            AnalyticsRecordedEvent {
+                agent_id,
+                success,
+                response_time,
+                earnings,
+            },
+        );
+
+        Ok(())
+    }
+
+    /// Get aggregated analytics for an agent.
+    pub fn get_analytics(env: Env, agent_id: Symbol) -> AgentAnalytics {
+        let key = DataKey::AgentAnalytics(agent_id.clone());
+        env.storage().persistent().get(&key).unwrap_or(AgentAnalytics {
+            agent_id,
+            total_tasks: 0,
+            successful_tasks: 0,
+            failed_tasks: 0,
+            total_earnings: 0,
+            avg_response_time: 0,
+            last_updated: 0,
+        })
+    }
+
+    /// Get top N agents by a configurable metric.
+    pub fn get_leaderboard(env: Env, metric: Symbol, limit: u32) -> Vec<LeaderboardEntry> {
+        let cap_key = DataKey::CapabilityIndex(metric.clone());
+        let agent_ids: Vec<Symbol> = env
+            .storage()
+            .persistent()
+            .get(&cap_key)
+            .unwrap_or_else(|| Vec::new(&env));
+
+        let mut entries: Vec<LeaderboardEntry> = Vec::new(&env);
+
+        let tasks_sym = Symbol::new(&env, "total_tasks");
+        let earnings_sym = Symbol::new(&env, "total_earnings");
+        let success_sym = Symbol::new(&env, "successful_tasks");
+
+        for id in agent_ids.iter() {
+            let analytics_key = DataKey::AgentAnalytics(id.clone());
+            if let Some(analytics) = env
+                .storage()
+                .persistent()
+                .get::<_, AgentAnalytics>(&analytics_key)
+            {
+                let metric_value = if metric == tasks_sym {
+                    analytics.total_tasks
+                } else if metric == earnings_sym {
+                    analytics.total_earnings as u64
+                } else if metric == success_sym {
+                    analytics.successful_tasks
+                } else {
+                    analytics.total_tasks
+                };
+
+                entries.push_back(LeaderboardEntry {
+                    agent_id: id,
+                    metric_value,
+                });
+            }
+        }
+
+        // Sort descending by metric_value
+        let mut i = 0;
+        while i < entries.len() {
+            let mut j = i + 1;
+            let mut max_idx = i;
+            while j < entries.len() {
+                if entries.get(j).unwrap().metric_value
+                    > entries.get(max_idx).unwrap().metric_value
+                {
+                    max_idx = j;
+                }
+                j += 1;
+            }
+            if max_idx != i {
+                let temp_i = entries.get(i).unwrap();
+                let temp_max = entries.get(max_idx).unwrap();
+                entries.set(i, temp_max);
+                entries.set(max_idx, temp_i);
+            }
+            i += 1;
+        }
+
+        // Truncate to limit
+        let mut result: Vec<LeaderboardEntry> = Vec::new(&env);
+        for i in 0..entries.len().min(limit) {
+            result.push_back(entries.get(i).unwrap());
+        }
+
+        env.events().publish(
+            (symbol_short!("registry"), symbol_short!("lb_upd")),
+            LeaderboardUpdatedEvent {
+                metric,
+                top_count: result.len(),
+            },
+        );
+
+        result
+    }
+
+    // ── SLA Enforcement ────────────────────────────────────────────────────
+
+    /// Set SLA terms for an agent.
+    pub fn set_sla(
+        env: Env,
+        agent_id: Symbol,
+        max_response_time: u32,
+        min_uptime: u32,
+        min_quality_score: u32,
+    ) -> Result<(), Error> {
+        // Verify agent exists
+        let agent_key = DataKey::Agent(agent_id.clone());
+        if !env.storage().persistent().has(&agent_key) {
+            return Err(Error::NotFound);
+        }
+
+        // Verify agent owner auth
+        let record: AgentRecord = env
+            .storage()
+            .persistent()
+            .get(&agent_key)
+            .ok_or(Error::NotFound)?;
+        record.owner.require_auth();
+
+        if max_response_time == 0 || min_uptime > 100 || min_quality_score > 100 {
+            return Err(Error::InvalidSla);
+        }
+
+        let sla_key = DataKey::AgentSla(agent_id.clone());
+        if env.storage().persistent().has(&sla_key) {
+            return Err(Error::SlaAlreadyExists);
+        }
+
+        let sla = AgentSla {
+            agent_id: agent_id.clone(),
+            max_response_time,
+            min_uptime,
+            min_quality_score,
+            created_at: env.ledger().sequence() as u64,
+            total_checks: 0,
+            violations: 0,
+            last_check_at: 0,
+        };
+
+        env.storage().persistent().set(&sla_key, &sla);
+        extend_ttl_for_key(&env, &sla_key);
+
+        env.events().publish(
+            (symbol_short!("registry"), symbol_short!("sla_set")),
+            SlaSetEvent {
+                agent_id,
+                max_response_time,
+                min_uptime,
+                min_quality_score,
+            },
+        );
+
+        Ok(())
+    }
+
+    /// Check SLA compliance for an agent and apply penalties/bonuses.
+    pub fn check_sla_compliance(
+        env: Env,
+        agent_id: Symbol,
+        actual_response_time: u32,
+        actual_uptime: u32,
+        actual_quality: u32,
+    ) -> Result<bool, Error> {
+        let sla_key = DataKey::AgentSla(agent_id.clone());
+        let mut sla: AgentSla = env
+            .storage()
+            .persistent()
+            .get(&sla_key)
+            .ok_or(Error::SlaNotFound)?;
+
+        sla.total_checks += 1;
+        sla.last_check_at = env.ledger().sequence() as u64;
+
+        let mut compliant = true;
+        let mut violation_type: Option<u32> = None;
+
+        // Check response time
+        if actual_response_time > sla.max_response_time {
+            compliant = false;
+            violation_type = Some(0);
+        }
+
+        // Check uptime
+        if actual_uptime < sla.min_uptime {
+            compliant = false;
+            if violation_type.is_none() {
+                violation_type = Some(1);
+            }
+        }
+
+        // Check quality
+        if actual_quality < sla.min_quality_score {
+            compliant = false;
+            if violation_type.is_none() {
+                violation_type = Some(2);
+            }
+        }
+
+        if !compliant {
+            sla.violations += 1;
+
+            // Record violation
+            let violation_count_key = DataKey::SlaViolationCount(agent_id.clone());
+            let v_count: u64 = env
+                .storage()
+                .persistent()
+                .get(&violation_count_key)
+                .unwrap_or(0);
+
+            let violation = SlaViolation {
+                agent_id: agent_id.clone(),
+                violation_type: violation_type.unwrap(),
+                detected_at: env.ledger().sequence() as u64,
+                penalty_applied: true,
+            };
+            let v_key = DataKey::SlaViolation(agent_id.clone(), v_count);
+            env.storage().persistent().set(&v_key, &violation);
+            env.storage()
+                .persistent()
+                .set(&violation_count_key, &(v_count + 1));
+            extend_ttl_for_key(&env, &v_key);
+
+            // Apply penalty: slash 10% of bond
+            let agent_key = DataKey::Agent(agent_id.clone());
+            let mut record: AgentRecord = env
+                .storage()
+                .persistent()
+                .get(&agent_key)
+                .ok_or(Error::NotFound)?;
+
+            let penalty = record.bond_amount * SLA_PENALTY_PERCENT / 100;
+            if penalty > 0 {
+                let remaining = if penalty >= record.bond_amount {
+                    0_i128
+                } else {
+                    record.bond_amount - penalty
+                };
+                record.bond_amount = remaining;
+                env.storage().persistent().set(&agent_key, &record);
+                extend_ttl_for_key(&env, &agent_key);
+
+                env.events().publish(
+                    (symbol_short!("registry"), symbol_short!("sla_viol")),
+                    SlaViolationDetectedEvent {
+                        agent_id: agent_id.clone(),
+                        violation_type: violation_type.unwrap(),
+                        penalty_stroops: penalty,
+                    },
+                );
+            }
+        } else {
+            // Bonus: reputation boost for consistently exceeding SLA
+            // Award bonus after 10 consecutive compliant checks
+            if sla.total_checks >= 10 && sla.violations == 0 {
+                env.events().publish(
+                    (symbol_short!("registry"), symbol_short!("sla_bonus")),
+                    SlaBonusAwardedEvent {
+                        agent_id,
+                        reputation_boost: SLA_BONUS_REPUTATION_BOOST,
+                    },
+                );
+            }
+        }
+
+        env.storage().persistent().set(&sla_key, &sla);
+        extend_ttl_for_key(&env, &sla_key);
+
+        Ok(compliant)
+    }
+
+    /// Get SLA status and compliance percentage for an agent.
+    pub fn get_sla_status(env: Env, agent_id: Symbol) -> Option<(AgentSla, u32)> {
+        let sla_key = DataKey::AgentSla(agent_id.clone());
+        let sla: AgentSla = env.storage().persistent().get(&sla_key)?;
+
+        let compliance = if sla.total_checks == 0 {
+            100u32
+        } else {
+            let compliant_checks = sla.total_checks - sla.violations;
+            ((compliant_checks * 100) / sla.total_checks) as u32
+        };
+
+        Some((sla, compliance))
     }
 }
 
