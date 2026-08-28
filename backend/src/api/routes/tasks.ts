@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import { getTaskDb, createTaskDb } from "../../db/tasks";
@@ -9,6 +9,7 @@ import { createTask, getTask } from "../../coordinator/taskStore";
 import { createLogger } from "../../utils/logger";
 import { validate } from "../middleware/validate";
 import { rateLimitMiddleware } from "../middleware/rateLimit";
+import { NotFoundError, ValidationError, RateLimitError, AppError } from "../../errors";
 
 import { getGlobalJobQueue, type JobQueue, type JobPriority } from "../../queue";
 
@@ -130,54 +131,57 @@ export function createTasksRouter(
    *               $ref: '#/components/schemas/Error'
    */
   // POST /api/tasks — rate-limited, then Zod-validated
-  tasksRouter.post("/", rateLimitMiddleware, validate(createTaskSchema), (req: Request, res: Response): void => {
-    const { prompt, priority } = req.body as z.infer<typeof createTaskSchema>;
-    // Body first, then the header (both spellings accepted), then "anonymous".
-    const walletPublicKey: string =
-      (req.body as z.infer<typeof createTaskSchema>).walletPublicKey ??
-      (req.headers["walletpublickey"] as string | undefined) ??
-      "anonymous";
+  tasksRouter.post("/", rateLimitMiddleware, validate(createTaskSchema), (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      const { prompt, priority } = req.body as z.infer<typeof createTaskSchema>;
+      // Body first, then the header (both spellings accepted), then "anonymous".
+      const walletPublicKey: string =
+        (req.body as z.infer<typeof createTaskSchema>).walletPublicKey ??
+        (req.headers["walletpublickey"] as string | undefined) ??
+        "anonymous";
 
-    // ── Per-wallet daily quota ───────────────────────────────────────────────
-    if (DAILY_TASK_LIMIT > 0 && walletPublicKey !== "anonymous") {
-      const db = createTaskDb(getTaskDb());
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const { total } = db.list(walletPublicKey, 1, 1, { createdAfter: since });
-      if (total >= DAILY_TASK_LIMIT) {
-        res.status(429).json({
-          error: {
-            message: `Daily task limit reached (max ${DAILY_TASK_LIMIT} per 24 hours)`,
-            code: "DAILY_LIMIT_EXCEEDED",
-          },
-        });
-        return;
+      // ── Per-wallet daily quota ───────────────────────────────────────────────
+      if (DAILY_TASK_LIMIT > 0 && walletPublicKey !== "anonymous") {
+        const db = createTaskDb(getTaskDb());
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { total } = db.list(walletPublicKey, 1, 1, { createdAfter: since });
+        if (total >= DAILY_TASK_LIMIT) {
+          const correlationId = res.locals.correlationId as string | undefined;
+          throw new RateLimitError(
+            `Daily task limit reached (max ${DAILY_TASK_LIMIT} per 24 hours)`,
+            { code: "DAILY_LIMIT_EXCEEDED", limit: DAILY_TASK_LIMIT, window: "24h" },
+            correlationId,
+          );
+        }
       }
+
+      const taskId = `task_${nanoid(12)}`;
+      const dag = decompose(taskId, prompt);
+      const now = new Date().toISOString();
+      const task: Task = {
+        id: taskId,
+        prompt,
+        walletPublicKey,
+        status: "queued",
+        dag,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      createTask(task);
+
+      // Enqueue task into persistent background job queue
+      jobQueue.enqueue({
+        taskId: task.id,
+        type: "execute_task",
+        priority: (priority as JobPriority) ?? "normal",
+        payload: { taskId: task.id },
+      });
+
+      res.status(201).json({ taskId: task.id, dagPreview: dag, status: "queued" });
+    } catch (err) {
+      next(err);
     }
-
-    const taskId = `task_${nanoid(12)}`;
-    const dag = decompose(taskId, prompt);
-    const now = new Date().toISOString();
-    const task: Task = {
-      id: taskId,
-      prompt,
-      walletPublicKey,
-      status: "queued",
-      dag,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    createTask(task);
-
-    // Enqueue task into persistent background job queue
-    jobQueue.enqueue({
-      taskId: task.id,
-      type: "execute_task",
-      priority: (priority as JobPriority) ?? "normal",
-      payload: { taskId: task.id },
-    });
-
-    res.status(201).json({ taskId: task.id, dagPreview: dag, status: "queued" });
   });
 
   /**
@@ -232,23 +236,31 @@ export function createTasksRouter(
    *               $ref: '#/components/schemas/Error'
    */
   // GET /api/tasks
-  tasksRouter.get("/", (req: Request, res: Response): void => {
-    const walletPublicKey = (req.headers["walletpublickey"] as string) ?? "";
-    const parse = TaskListSchema.safeParse(req.query);
-    if (!parse.success) {
-      res.status(400).json({ error: parse.error.flatten() });
-      return;
+  tasksRouter.get("/", (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      const walletPublicKey = (req.headers["walletpublickey"] as string) ?? "";
+      const parse = TaskListSchema.safeParse(req.query);
+      if (!parse.success) {
+        const correlationId = res.locals.correlationId as string | undefined;
+        throw new ValidationError(
+          "Invalid query parameters",
+          { issues: parse.error.flatten() },
+          correlationId,
+        );
+      }
+
+      const { page, pageSize, status, sort, q } = parse.data;
+      const db = createTaskDb(getTaskDb());
+      const { tasks, total } = db.list(walletPublicKey, page, pageSize, {
+        status,
+        sort,
+        q: q && q.length > 0 ? q : undefined,
+      });
+
+      res.json({ tasks, total, page, pageSize });
+    } catch (err) {
+      next(err);
     }
-
-    const { page, pageSize, status, sort, q } = parse.data;
-    const db = createTaskDb(getTaskDb());
-    const { tasks, total } = db.list(walletPublicKey, page, pageSize, {
-      status,
-      sort,
-      q: q && q.length > 0 ? q : undefined,
-    });
-
-    res.json({ tasks, total, page, pageSize });
   });
 
   /**
@@ -285,19 +297,22 @@ export function createTasksRouter(
    *               $ref: '#/components/schemas/Error'
    */
   // GET /api/tasks/:id
-  tasksRouter.get("/:id", (req: Request, res: Response): void => {
-    const db = createTaskDb(getTaskDb());
-    const task = db.findById(req.params.id);
-    if (!task) {
-      res.status(404).json({ error: "Task not found" });
-      return;
+  tasksRouter.get("/:id", (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      const correlationId = res.locals.correlationId as string | undefined;
+      const db = createTaskDb(getTaskDb());
+      const task = db.findById(req.params.id);
+      if (!task) {
+        throw new NotFoundError("Task", req.params.id, undefined, correlationId);
+      }
+      const requesterKey = req.headers["walletpublickey"] as string;
+      if (!requesterKey || requesterKey !== task.walletPublicKey) {
+        throw new AppError("Access denied", 403, "FORBIDDEN", undefined, correlationId);
+      }
+      res.json(task);
+    } catch (err) {
+      next(err);
     }
-    const requesterKey = req.headers["walletpublickey"] as string;
-    if (!requesterKey || requesterKey !== task.walletPublicKey) {
-      res.status(403).json({ error: "Access denied" });
-      return;
-    }
-    res.json(task);
   });
 
   /**
@@ -344,27 +359,36 @@ export function createTasksRouter(
    *               $ref: '#/components/schemas/Error'
    */
   // DELETE /api/tasks/:id
-  tasksRouter.delete("/:id", (req: Request, res: Response): void => {
-    const db = createTaskDb(getTaskDb());
-    const task = db.findById(req.params.id);
-    if (!task) {
-      res.status(404).json({ error: "Task not found" });
-      return;
-    }
+  tasksRouter.delete("/:id", (req: Request, res: Response, next: NextFunction): void => {
+    try {
+      const correlationId = res.locals.correlationId as string | undefined;
+      const db = createTaskDb(getTaskDb());
+      const task = db.findById(req.params.id);
+      if (!task) {
+        throw new NotFoundError("Task", req.params.id, undefined, correlationId);
+      }
 
-    const requesterKey = req.headers["walletpublickey"] as string;
-    if (!requesterKey || requesterKey !== task.walletPublicKey) {
-      res.status(403).json({ error: "Not authorized to cancel this task" });
-      return;
-    }
+      const requesterKey = req.headers["walletpublickey"] as string;
+      if (!requesterKey || requesterKey !== task.walletPublicKey) {
+        throw new AppError("Not authorized to cancel this task", 403, "FORBIDDEN", undefined, correlationId);
+      }
 
-    if (task.status !== "queued") {
-      res.status(409).json({ error: `Cannot cancel task in '${task.status}' status` });
-      return;
-    }
+      if (task.status !== "queued") {
+        // 409 Conflict — use AppError directly since there's no ConflictError subclass
+        throw new AppError(
+          `Cannot cancel task in '${task.status}' status`,
+          409,
+          "CONFLICT",
+          { currentStatus: task.status },
+          correlationId,
+        );
+      }
 
-    db.updateStatus(req.params.id, "cancelled");
-    res.json({ taskId: req.params.id, status: "cancelled" });
+      db.updateStatus(req.params.id, "cancelled");
+      res.json({ taskId: req.params.id, status: "cancelled" });
+    } catch (err) {
+      next(err);
+    }
   });
 
   return tasksRouter;
