@@ -255,7 +255,7 @@ export class Coordinator {
               }
             })
             .catch(err => {
-              console.error('[coordinator] runNode threw unexpectedly:', err);
+              this.log.error({ err, taskId, nodeId: node.nodeId }, "runNode threw unexpectedly");
               failed.add(node.nodeId);
             })
             .finally(() => {

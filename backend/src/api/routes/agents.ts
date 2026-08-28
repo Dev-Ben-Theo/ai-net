@@ -1,25 +1,14 @@
 import { Router, Request, Response } from "express";
-import { z } from "zod";
 import { Horizon, Keypair } from "@stellar/stellar-sdk";
 import { getAgentDb, createAgentDb, AgentDb } from "../../db/agents";
 import { heartbeatRateLimitMiddleware } from "../middleware/rateLimit";
+import { validate } from "../middleware/validate";
+import { RegisterAgentSchema, AgentListQuerySchema } from "../schemas/agent.schema";
 
 export interface AgentsRouterOptions {
   healthTimeoutMs?: number;
   db?: AgentDb;
 }
-
-const STELLAR_PUBLIC_KEY_REGEX = /^G[A-Z2-7]{55}$/;
-
-const RegisterAgentSchema = z.object({
-  agentId: z.string(),
-  capabilities: z.array(z.string()),
-  pricingXLM: z.number().positive("Price must be positive"),
-  endpoint: z.string().url(),
-  stellarPublicKey: z
-    .string()
-    .regex(STELLAR_PUBLIC_KEY_REGEX, "Invalid Stellar public key format"),
-});
 
 const DEFAULT_HEALTH_TIMEOUT_MS = 3_000;
 const HORIZON_URL = process.env.STELLAR_HORIZON_URL || "https://horizon-testnet.stellar.org";
@@ -276,15 +265,9 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    *             schema:
    *               $ref: '#/components/schemas/Error'
    */
-  // POST /api/agents/register
-  router.post("/register", async (req: Request, res: Response): Promise<void> => {
-    const parse = RegisterAgentSchema.safeParse(req.body);
-    if (!parse.success) {
-      res.status(400).json({ error: parse.error.flatten() });
-      return;
-    }
-    
-    const data = parse.data;
+  // POST /api/agents/register — Zod-validated
+  router.post("/register", validate({ body: RegisterAgentSchema }), async (req: Request, res: Response): Promise<void> => {
+    const data = req.body;
     
     // Verify Stellar account exists
     if (process.env.SKIP_STELLAR_ACCOUNT_VERIFY !== "true") {
