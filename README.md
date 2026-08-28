@@ -129,6 +129,54 @@ cp .env.example .env
 # Fill in your Stellar keypair and Venice AI key
 ```
 
+### Smart Contract Deployment
+
+Deploy contracts to testnet:
+
+```bash
+cd smart-contracts
+cp .env.example .env
+# Fill in STELLAR_SECRET_KEY and VENICE_API_KEY
+
+# Deploy all contracts
+./scripts/deploy.sh --network testnet
+
+# Verify deployment
+./scripts/verify.sh --network testnet
+```
+
+### Smart Contract Upgrades
+
+Upgrade deployed contracts:
+
+```bash
+cd smart-contracts
+
+# Dry run to see what would be upgraded
+./scripts/upgrade.sh --network testnet --dry-run
+
+# Upgrade specific contract
+./scripts/upgrade.sh --network testnet agent-registry
+
+# Upgrade all contracts
+./scripts/upgrade.sh --network testnet
+```
+
+For detailed upgrade procedures and storage migration guidance, see [STORAGE_MIGRATION.md](smart-contracts/docs/STORAGE_MIGRATION.md).
+
+### Database migration
+This branch does not include an automated migration runner. To apply the backend index migration, run the SQL script directly against your PostgreSQL database:
+
+```bash
+psql "$DATABASE_URL" -f backend/src/db/migrations/001_add_stats_indexes.sql
+```
+
+If you need an explicit connection, use:
+
+```bash
+psql -h <host> -U <user> -d <database> -f backend/src/db/migrations/001_add_stats_indexes.sql
+```
+
 ### Run (testnet)
 
 ```bash
@@ -139,6 +187,21 @@ npm run dev
 
 ```bash
 npm test
+```
+
+### Run smart-contract E2E tests
+
+The full market report pipeline test runs against Stellar testnet and is expected
+to take 60-120 seconds. It funds fresh testnet accounts through Friendbot,
+executes the five-node market report DAG, verifies payment operations through
+Horizon, and validates the final Report Agent result.
+
+```bash
+cd smart-contracts
+cp .env.example .env
+# Fill STELLAR_COORDINATOR_SECRET and VENICE_API_KEY when running in CI.
+# Set RUN_STELLAR_E2E_TESTS=true in .env.
+npm run test:e2e
 ```
 
 ---
