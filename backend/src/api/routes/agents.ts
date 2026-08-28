@@ -36,7 +36,8 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    * @openapi
    * /api/agents:
    *   get:
-   *     summary: List registered agents
+   *     summary: List registered AI agents
+   *     description: Retrieves registered agents matching optional capability, minimum reputation, and maximum price filters.
    *     operationId: listAgents
    *     tags: [Agents]
    *     security: []
@@ -45,27 +46,47 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    *         name: capability
    *         schema: { type: string }
    *         description: Filter agents that support this capability
+   *         example: "research"
    *       - in: query
    *         name: minReputation
    *         schema: { type: number }
+   *         description: Minimum reputation score threshold
+   *         example: 80.0
    *       - in: query
    *         name: maxPriceXLM
    *         schema: { type: number }
+   *         description: Maximum price per task execution in XLM
+   *         example: 1.5
    *     responses:
    *       200:
-   *         description: List of agents
+   *         description: Array of matching registered agents
+   *         headers:
+   *           X-RateLimit-Limit:
+   *             $ref: '#/components/headers/X-RateLimit-Limit'
+   *           X-RateLimit-Remaining:
+   *             $ref: '#/components/headers/X-RateLimit-Remaining'
+   *           X-RateLimit-Reset:
+   *             $ref: '#/components/headers/X-RateLimit-Reset'
    *         content:
    *           application/json:
    *             schema:
    *               type: array
    *               items:
    *                 $ref: '#/components/schemas/Agent'
+   *             example:
+   *               - id: "agent_crypto_analyst_01"
+   *                 capabilities: ["research", "report"]
+   *                 pricingXLM: 0.25
+   *                 endpoint: "https://agent-crypto.example.com/api"
+   *                 stellarPublicKey: "GABZXN7PIRZGNMHGA728XZVOG2GUFIDLAZ6AF2I2MD2OCYTAF2K1K4XYZ"
+   *                 reputationScore: 98.5
+   *                 lastSeenAt: "2026-08-25T17:20:00.000Z"
    *       500:
    *         description: Internal server error
    *         content:
    *           application/json:
    *             schema:
-   *               $ref: '#/components/schemas/Error'
+   *               $ref: '#/components/schemas/InternalServerError'
    */
   // GET /api/agents
   router.get("/", (req: Request, res: Response, next: NextFunction): void => {
@@ -86,7 +107,8 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    * @openapi
    * /api/agents/{id}:
    *   get:
-   *     summary: Get an agent by ID
+   *     summary: Get registered agent by ID
+   *     description: Fetches agent profile, capabilities, reputation score, and status by unique agentId.
    *     operationId: getAgent
    *     tags: [Agents]
    *     security: []
@@ -95,19 +117,31 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    *         name: id
    *         required: true
    *         schema: { type: string }
+   *         description: Unique agent identifier
+   *         example: "agent_crypto_analyst_01"
    *     responses:
    *       200:
-   *         description: Agent found
+   *         description: Agent details retrieved successfully
    *         content:
    *           application/json:
    *             schema:
    *               $ref: '#/components/schemas/Agent'
+   *             example:
+   *               id: "agent_crypto_analyst_01"
+   *               capabilities: ["research", "report"]
+   *               pricingXLM: 0.25
+   *               endpoint: "https://agent-crypto.example.com/api"
+   *               stellarPublicKey: "GABZXN7PIRZGNMHGA728XZVOG2GUFIDLAZ6AF2I2MD2OCYTAF2K1K4XYZ"
+   *               reputationScore: 98.5
+   *               lastSeenAt: "2026-08-25T17:20:00.000Z"
    *       404:
    *         description: Agent not found
    *         content:
    *           application/json:
    *             schema:
-   *               $ref: '#/components/schemas/Error'
+   *               $ref: '#/components/schemas/NotFoundError'
+   *             example:
+   *               error: "Agent not found"
    */
   // GET /api/agents/:id
   router.get("/:id", (req: Request, res: Response, next: NextFunction): void => {
@@ -142,6 +176,7 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    *         name: id
    *         required: true
    *         schema: { type: string }
+   *         example: "agent_crypto_analyst_01"
    *     responses:
    *       200:
    *         description: Health check result
@@ -153,14 +188,16 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    *                 status:
    *                   type: string
    *                   enum: [healthy, unreachable]
+   *                   example: "healthy"
    *                 latencyMs:
    *                   type: number
+   *                   example: 45
    *       404:
    *         description: Agent not found
    *         content:
    *           application/json:
    *             schema:
-   *               $ref: '#/components/schemas/Error'
+   *               $ref: '#/components/schemas/NotFoundError'
    */
   // GET /api/agents/:id/health
   router.get("/:id/health", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -201,52 +238,12 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
 
   /**
    * @openapi
-   * /api/agents/{id}/heartbeat:
-   *   post:
-   *     summary: Agent heartbeat ping
-   *     description: Updates the agent's lastSeenAt timestamp and sets status to online.
-   *     tags: [Agents]
-   *     security: []
-   *     operationId: agentHeartbeat
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema: { type: string }
-   *     responses:
-   *       200:
-   *         description: Heartbeat recorded
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 status:
-   *                   type: string
-   *                   example: ok
-   *                 lastSeenAt:
-   *                   type: string
-   *       404:
-   *         description: Agent not found
-   *         content:
-   *           application/json:
-   *             schema:
-   *               $ref: '#/components/schemas/Error'
-   */
-  // POST /api/agents/:id/heartbeat — handled below after /register to avoid
-  // shadowing the /register route. The duplicate handler here is removed.
-
-
-  /**
-   * @openapi
    * /api/agents/register:
    *   post:
-   *     summary: Register a new agent
+   *     summary: Register a new specialized agent
    *     description: >
-   *       Verifies that the provided Stellar public key corresponds to an
-   *       existing funded account on Horizon testnet before registering the
-   *       agent. Registration fails with 400 if the account cannot be found
-   *       or verified.
+   *       Registers an agent with specified capabilities and pricing. Verifies that the provided
+   *       Stellar public key corresponds to a valid funded account on Stellar Horizon.
    *     tags: [Agents]
    *     security: []
    *     operationId: registerAgent
@@ -255,35 +252,44 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    *       content:
    *         application/json:
    *           schema:
-   *             type: object
-   *             required: [agentId, capabilities, pricingXLM, endpoint, stellarPublicKey]
-   *             properties:
-   *               agentId:
-   *                 type: string
-   *               capabilities:
-   *                 type: array
-   *                 items:
-   *                   type: string
-   *               pricingXLM:
-   *                 type: number
-   *               endpoint:
-   *                 type: string
-   *                 format: uri
-   *               stellarPublicKey:
-   *                 type: string
+   *             $ref: '#/components/schemas/RegisterAgentRequest'
+   *           examples:
+   *             crypto_research_agent:
+   *               summary: Crypto Research Agent
+   *               value:
+   *                 agentId: "agent_crypto_analyst_01"
+   *                 capabilities: ["research", "report"]
+   *                 pricingXLM: 0.25
+   *                 endpoint: "https://agent-crypto.example.com/api"
+   *                 stellarPublicKey: "GABZXN7PIRZGNMHGA728XZVOG2GUFIDLAZ6AF2I2MD2OCYTAF2K1K4XYZ"
    *     responses:
    *       201:
-   *         description: Agent registered
+   *         description: Agent registered successfully
+   *         headers:
+   *           X-RateLimit-Limit:
+   *             $ref: '#/components/headers/X-RateLimit-Limit'
+   *           X-RateLimit-Remaining:
+   *             $ref: '#/components/headers/X-RateLimit-Remaining'
+   *           X-RateLimit-Reset:
+   *             $ref: '#/components/headers/X-RateLimit-Reset'
    *         content:
    *           application/json:
    *             schema:
    *               $ref: '#/components/schemas/Agent'
    *       400:
-   *         description: Validation error or Stellar account not found/unverifiable
+   *         description: Validation error or Stellar account verification failure
    *         content:
    *           application/json:
    *             schema:
-   *               $ref: '#/components/schemas/Error'
+   *               $ref: '#/components/schemas/ValidationError'
+   *             example:
+   *               error: "StellarAccountNotFound"
+   *       429:
+   *         description: Registration rate limit exceeded
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/RateLimitError'
    */
   // POST /api/agents/register
   router.post("/register", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -346,8 +352,8 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    * @openapi
    * /api/agents/{id}/heartbeat:
    *   post:
-   *     summary: Agent heartbeat ping
-   *     description: Updates the agent's lastSeenAt timestamp and sets status to online.
+   *     summary: Agent heartbeat keep-alive
+   *     description: Updates the agent's lastSeenAt timestamp and keeps its online status active.
    *     tags: [Agents]
    *     security: []
    *     operationId: agentHeartbeat
@@ -356,25 +362,29 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    *         name: id
    *         required: true
    *         schema: { type: string }
+   *         example: "agent_crypto_analyst_01"
    *     responses:
    *       200:
    *         description: Heartbeat recorded
    *         content:
    *           application/json:
    *             schema:
-   *               type: object
-   *               properties:
-   *                 status:
-   *                   type: string
-   *                   example: ok
-   *                 lastSeenAt:
-   *                   type: string
+   *               $ref: '#/components/schemas/AgentHeartbeatResponse'
+   *             example:
+   *               status: "ok"
+   *               lastSeenAt: "2026-08-25T17:30:00.000Z"
    *       404:
    *         description: Agent not found
    *         content:
    *           application/json:
    *             schema:
-   *               $ref: '#/components/schemas/Error'
+   *               $ref: '#/components/schemas/NotFoundError'
+   *       429:
+   *         description: Heartbeat rate limit exceeded
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/RateLimitError'
    */
   // POST /api/agents/:id/heartbeat
   router.post("/:id/heartbeat", heartbeatRateLimitMiddleware, (req: Request, res: Response, next: NextFunction): void => {
@@ -397,6 +407,60 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
     }
   });
 
+  /**
+   * @openapi
+   * /api/agents/{id}:
+   *   delete:
+   *     summary: Deregister an agent
+   *     description: >
+   *       Removes an agent from the registry. Requires cryptographic verification of
+   *       an Ed25519 signature generated with the agent's registered Stellar secret key.
+   *     tags: [Agents]
+   *     security:
+   *       - AgentSignatureAuth: []
+   *       - AgentChallengeAuth: []
+   *     operationId: deleteAgent
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema: { type: string }
+   *         description: Unique agent identifier
+   *         example: "agent_crypto_analyst_01"
+   *       - in: header
+   *         name: x-signature
+   *         required: true
+   *         schema: { type: string }
+   *         description: Base64-encoded Ed25519 signature of the challenge
+   *       - in: header
+   *         name: x-challenge
+   *         required: true
+   *         schema: { type: string }
+   *         description: Plaintext challenge string matching the server challenge
+   *     responses:
+   *       200:
+   *         description: Agent deleted successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message: { type: string, example: "Agent deleted successfully" }
+   *       401:
+   *         description: Missing or invalid signature/challenge
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/UnauthorizedError'
+   *             example:
+   *               error: "Invalid signature"
+   *       404:
+   *         description: Agent not found
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/NotFoundError'
+   */
   // DELETE /api/agents/:id
   router.delete("/:id", (req: Request, res: Response, next: NextFunction): void => {
     try {

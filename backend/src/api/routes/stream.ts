@@ -80,21 +80,53 @@ export interface TaskStreamDeps extends TaskStreamOptions {
 }
 
 /**
- * Every WebSocketServer currently attached to an HTTP server.
+ * @openapi
+ * /tasks/{id}/stream:
+ *   get:
+ *     summary: WebSocket Live Task Execution Stream (ws://)
+ *     description: >
+ *       **WebSocket Endpoint:** `ws://<host>/tasks/:id/stream`
  *
- * Tracked so the health dashboard can report live connection counts without
- * threading a handle through `createApp`.
+ *       Streams real-time DAG execution events, node state transitions, and Stellar payment release hashes.
+ *
+ *       ### Handshake & Authentication:
+ *       1. Connect to `ws://<host>/tasks/:id/stream` (optionally appending `?lastEventId=<seq>` for cursor resumption).
+ *       2. Send JSON auth payload within 10 seconds: `{"walletPublicKey": "G..."}`.
+ *       3. Server verifies ownership. If wallet does not own task, connection closes with close code `4003` (Forbidden).
+ *
+ *       ### Events Received:
+ *       - `node_started`: Node execution began with assigned agent.
+ *       - `node_completed`: Node successfully finished.
+ *       - `payment_released`: Stellar escrow payment released with txHash.
+ *       - `task_completed` / `task_failed`: Task lifecycle finished.
+ *
+ *       ### Heartbeat:
+ *       - Server sends periodic ping every 30s.
+ *       - Client must reply with `{"type": "pong"}` within 10s.
+ *     tags: [WebSocket Stream]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Task ID to stream
+ *         example: "task_ab12cd34ef56"
+ *       - in: query
+ *         name: lastEventId
+ *         required: false
+ *         schema: { type: integer, minimum: 0 }
+ *         description: Monotonic sequence number cursor to resume replay from
+ *         example: 4
+ *     responses:
+ *       101:
+ *         description: Switching Protocols to WebSocket
+ *       400:
+ *         description: Invalid request or malformed auth handshake payload
+ *       403:
+ *         description: Forbidden - wallet does not own task (WS close code 4003)
+ *       404:
+ *         description: Task not found (WS close code 4004)
  */
-const activeStreamServers = new Set<WebSocketServer>();
-
-/** Total number of clients connected across all attached stream servers. */
-export function getStreamConnectionCount(): number {
-  let total = 0;
-  for (const server of activeStreamServers) {
-    total += server.clients.size;
-  }
-  return total;
-}
 
 /**
  * Attach the live DAG-execution stream to an HTTP server.
