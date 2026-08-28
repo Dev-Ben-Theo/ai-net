@@ -10,18 +10,6 @@ export interface AgentsRouterOptions {
   db?: AgentDb;
 }
 
-const STELLAR_PUBLIC_KEY_REGEX = /^G[A-Z2-7]{55}$/;
-
-const RegisterAgentSchema = z.object({
-  agentId: z.string(),
-  capabilities: z.array(z.string()),
-  pricingXLM: z.number().positive("Price must be positive"),
-  endpoint: z.string().url(),
-  stellarPublicKey: z
-    .string()
-    .regex(STELLAR_PUBLIC_KEY_REGEX, "Invalid Stellar public key format"),
-});
-
 const DEFAULT_HEALTH_TIMEOUT_MS = 3_000;
 const HORIZON_URL = process.env.STELLAR_HORIZON_URL || "https://horizon-testnet.stellar.org";
 const horizon = new Horizon.Server(HORIZON_URL);

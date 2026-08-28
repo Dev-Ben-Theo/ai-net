@@ -134,7 +134,7 @@ export function TaskSubmissionForm() {
             aria-invalid={Boolean(errors.prompt)}
             aria-describedby="prompt-error"
           />
-          <p id="prompt-error" style={{ color: '#b91c1c', marginTop: 8 }}>
+          <p id="prompt-error" style={{ color: 'var(--danger)', marginTop: 8 }}>
             {errors.prompt?.message}
           </p>
         </div>
@@ -153,7 +153,7 @@ export function TaskSubmissionForm() {
             aria-invalid={Boolean(errors.maxBudgetXLM)}
             aria-describedby="budget-error"
           />
-          <p id="budget-error" style={{ color: '#b91c1c', marginTop: 8 }}>
+          <p id="budget-error" style={{ color: 'var(--danger)', marginTop: 8 }}>
             {budgetHelperText}
           </p>
         </div>
@@ -236,7 +236,7 @@ export function TaskSubmissionForm() {
             {isLoading ? t('task.submit.submitting') : t('task.submit.submit')}
           </button>
           {status === 'success' && (
-            <span style={{ color: '#16a34a' }}>{t('task.submit.success')}</span>
+            <span style={{ color: 'var(--success)' }}>{t('task.submit.success')}</span>
           )}
         </div>
       </form>
@@ -260,8 +260,9 @@ export function TaskSubmissionForm() {
             marginTop: 24,
             padding: 16,
             borderRadius: 12,
-            background: '#f8d7da',
-            color: '#842029',
+            background: 'var(--bg-secondary)',
+            color: 'var(--danger)',
+            border: '1px solid var(--danger)',
           }}
         >
           {error}

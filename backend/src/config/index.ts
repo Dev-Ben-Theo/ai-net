@@ -76,6 +76,18 @@ const envSchema = z.object({
    */
   ADMIN_API_KEY: z.string().min(1).optional(),
 
+  // ── WebSocket Stream ────────────────────────────────────────────────────────
+  /** Maximum concurrent WebSocket connections per client IP. Default: 5. */
+  WS_MAX_CONNECTIONS_PER_CLIENT: z.coerce.number().int().positive().default(5),
+  /** Maximum messages per minute per WebSocket connection. Default: 100. */
+  WS_MAX_MESSAGES_PER_MINUTE: z.coerce.number().int().positive().default(100),
+  /** Auto-disconnect after N ms of inactivity. Default: 1800000 (30 min). */
+  WS_INACTIVITY_TIMEOUT_MS: z.coerce.number().int().positive().default(1_800_000),
+  /** Heartbeat ping interval in ms. Default: 30000 (30 s). */
+  WS_HEARTBEAT_INTERVAL_MS: z.coerce.number().int().positive().default(30_000),
+  /** Pong timeout before marking connection stale. Default: 10000 (10 s). */
+  WS_PONG_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+
   // ── Health dashboard metrics ────────────────────────────────────────────────
   /** How long a dashboard snapshot is served before recollection. Default: 5 000 (5 s). */
   METRICS_CACHE_TTL_MS: z.coerce.number().int().positive().default(5_000),
