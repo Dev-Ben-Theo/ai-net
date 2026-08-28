@@ -9,7 +9,7 @@ import { createTask, getTask } from "../../coordinator/taskStore";
 import { createLogger } from "../../utils/logger";
 import { validate } from "../middleware/validate";
 import { rateLimitMiddleware } from "../middleware/rateLimit";
-import { NotFoundError, ValidationError, RateLimitError, AuthenticationError, AppError } from "../../errors";
+import { NotFoundError, ValidationError, RateLimitError, AppError } from "../../errors";
 
 import { getGlobalJobQueue, type JobQueue, type JobPriority } from "../../queue";
 
@@ -307,7 +307,7 @@ export function createTasksRouter(
       }
       const requesterKey = req.headers["walletpublickey"] as string;
       if (!requesterKey || requesterKey !== task.walletPublicKey) {
-        throw new AuthenticationError("Access denied", undefined, correlationId);
+        throw new AppError("Access denied", 403, "FORBIDDEN", undefined, correlationId);
       }
       res.json(task);
     } catch (err) {
@@ -370,7 +370,7 @@ export function createTasksRouter(
 
       const requesterKey = req.headers["walletpublickey"] as string;
       if (!requesterKey || requesterKey !== task.walletPublicKey) {
-        throw new AuthenticationError("Not authorized to cancel this task", undefined, correlationId);
+        throw new AppError("Not authorized to cancel this task", 403, "FORBIDDEN", undefined, correlationId);
       }
 
       if (task.status !== "queued") {
