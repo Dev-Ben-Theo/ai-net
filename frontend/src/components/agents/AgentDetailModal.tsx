@@ -3,6 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { ExternalLink, X } from 'lucide-react'
 import type { AgentRecord } from '../../types/api'
 import { ReputationStars } from './ReputationStars'
+import { useAgentReputation } from '../../hooks/useAgentReputation'
+import { AgentReputationRadar } from './AgentReputationRadar'
+import { AgentReputationTrend } from './AgentReputationTrend'
 import styles from './AgentDetailModal.module.css'
 
 const STELLAR_EXPLORER = 'https://stellar.expert/explorer/testnet'
@@ -120,6 +123,22 @@ export function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
                 </a>
               ) : (
                 <span className={styles.value}>{t('common.notAvailable')}</span>
+              )}
+            </dd>
+          </div>
+
+          <div className={styles.fieldWide}>
+            <dt>Reputation Details</dt>
+            <dd>
+              {reputationLoading ? (
+                <div>Loading charts...</div>
+              ) : reputationData ? (
+                <div className={styles.chartsContainer}>
+                  <AgentReputationRadar dimensions={reputationData.dimensions} />
+                  <AgentReputationTrend history={reputationData.history} />
+                </div>
+              ) : (
+                <div>No detailed reputation data available</div>
               )}
             </dd>
           </div>
