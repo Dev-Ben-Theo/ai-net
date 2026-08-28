@@ -10,6 +10,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "agent-marketplace"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "agent-registry"
 version = "0.1.0"
 dependencies = [
@@ -479,6 +486,13 @@ dependencies = [
  "const-oid",
  "crypto-common",
  "subtle",
+]
+
+[[package]]
+name = "dispute-resolution"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
 ]
 
 [[package]]
