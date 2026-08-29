@@ -220,6 +220,10 @@ npm run test:e2e
 
 ## Documentation
 
+- [Developer Setup Guide](docs/DEVELOPER_SETUP.md): Fast onboarding from clean clone to running local node, testnet deployments, Freighter wallet setup, and testing.
+- [Governance & Timelock Architecture](docs/architecture/governance-timelock.md): Multi-signature quorum, timelock lifecycle, and emergency circuit breakers.
+- [Technical Architecture Specification](docs/architecture/index.md): System context, component diagrams, and Soroban payment escrow settlement workflows.
+- [REST API Reference](docs/API_REFERENCE.md): Comprehensive endpoint schemas, error codes, and runnable curl examples.
 - [Node Operators Guide](docs/NODE_OPERATORS_GUIDE.md): Step-by-step instructions for provisioning, configuring secrets, deploying smart contracts, funding accounts, operating nodes, monitoring metrics, and troubleshooting common errors.
 - [Smart Contract Deployment Guide](smart-contracts/docs/DEPLOYMENT_GUIDE.md): Complete deployment and upgrade workflows on Soroban.
 - [End-to-End Testing Guide](docs/e2e-testing.md): Automated test execution and validation.
