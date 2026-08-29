@@ -1967,3 +1967,122 @@ fn sla_violation_penalty_slashes_bond() {
     let expected_penalty = initial_bond * SLA_PENALTY_PERCENT / 100;
     assert_eq!(remaining_bond, initial_bond - expected_penalty);
 }
+
+// ─── Pagination Tests (Issue #339) ──────────────────────────────────────────
+
+#[test]
+fn test_get_agents_empty_registry() {
+    let (env, client) = setup();
+    let page = client.get_agents(&None, &None);
+    assert_eq!(page.agents.len(), 0);
+    assert_eq!(page.next_cursor, None);
+    assert_eq!(page.total_count, 0);
+}
+
+#[test]
+fn test_get_agents_single_page() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+
+    client.register_agent(&make_record(&env, "agent_1", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_2", "research", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_3", "design", owner.clone()));
+
+    let page = client.get_agents(&None, &Some(10));
+    assert_eq!(page.agents.len(), 3);
+    assert_eq!(page.next_cursor, None);
+    assert_eq!(page.total_count, 3);
+    assert_eq!(page.agents.get(0).unwrap().id, Symbol::new(&env, "agent_1"));
+    assert_eq!(page.agents.get(1).unwrap().id, Symbol::new(&env, "agent_2"));
+    assert_eq!(page.agents.get(2).unwrap().id, Symbol::new(&env, "agent_3"));
+}
+
+#[test]
+fn test_get_agents_cursor_pagination() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+
+    // Register 7 agents
+    client.register_agent(&make_record(&env, "agent_1", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_2", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_3", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_4", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_5", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_6", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_7", "code", owner.clone()));
+
+    assert_eq!(client.total_agents(), 7);
+
+    // Page 1: limit 3
+    let page1 = client.get_agents(&None, &Some(3));
+    assert_eq!(page1.agents.len(), 3);
+    assert_eq!(page1.total_count, 7);
+    assert_eq!(page1.next_cursor, Some(3));
+    assert_eq!(page1.agents.get(0).unwrap().id, Symbol::new(&env, "agent_1"));
+    assert_eq!(page1.agents.get(1).unwrap().id, Symbol::new(&env, "agent_2"));
+    assert_eq!(page1.agents.get(2).unwrap().id, Symbol::new(&env, "agent_3"));
+
+    // Page 2: cursor 3, limit 3
+    let page2 = client.get_agents(&page1.next_cursor, &Some(3));
+    assert_eq!(page2.agents.len(), 3);
+    assert_eq!(page2.total_count, 7);
+    assert_eq!(page2.next_cursor, Some(6));
+    assert_eq!(page2.agents.get(0).unwrap().id, Symbol::new(&env, "agent_4"));
+    assert_eq!(page2.agents.get(1).unwrap().id, Symbol::new(&env, "agent_5"));
+    assert_eq!(page2.agents.get(2).unwrap().id, Symbol::new(&env, "agent_6"));
+
+    // Page 3: cursor 6, limit 3 -> last remaining agent
+    let page3 = client.get_agents(&page2.next_cursor, &Some(3));
+    assert_eq!(page3.agents.len(), 1);
+    assert_eq!(page3.total_count, 7);
+    assert_eq!(page3.next_cursor, None);
+    assert_eq!(page3.agents.get(0).unwrap().id, Symbol::new(&env, "agent_7"));
+}
+
+#[test]
+fn test_get_agents_stable_boundaries_under_deregistration() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+
+    client.register_agent(&make_record(&env, "agent_1", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_2", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_3", "code", owner.clone()));
+
+    // Deregister agent_2
+    client.deregister_agent(&Symbol::new(&env, "agent_2"));
+    assert_eq!(client.total_agents(), 2);
+
+    // Listing with limit 10 returns active agents (agent_1, agent_3) and total_count = 2
+    let page = client.get_agents(&None, &Some(10));
+    assert_eq!(page.agents.len(), 2);
+    assert_eq!(page.total_count, 2);
+    assert_eq!(page.next_cursor, None);
+    assert_eq!(page.agents.get(0).unwrap().id, Symbol::new(&env, "agent_1"));
+    assert_eq!(page.agents.get(1).unwrap().id, Symbol::new(&env, "agent_3"));
+}
+
+#[test]
+fn test_get_agents_batch_registered_pagination() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+
+    let mut batch = soroban_sdk::Vec::new(&env);
+    batch.push_back(make_record(&env, "batch_1", "code", owner.clone()));
+    batch.push_back(make_record(&env, "batch_2", "code", owner.clone()));
+    batch.push_back(make_record(&env, "batch_3", "code", owner.clone()));
+    batch.push_back(make_record(&env, "batch_4", "code", owner.clone()));
+
+    let results = client.register_agents(&batch);
+    assert_eq!(results.len(), 4);
+
+    let page1 = client.get_agents(&Some(0), &Some(2));
+    assert_eq!(page1.agents.len(), 2);
+    assert_eq!(page1.next_cursor, Some(2));
+    assert_eq!(page1.total_count, 4);
+
+    let page2 = client.get_agents(&page1.next_cursor, &Some(2));
+    assert_eq!(page2.agents.len(), 2);
+    assert_eq!(page2.next_cursor, None);
+    assert_eq!(page2.total_count, 4);
+}
+
