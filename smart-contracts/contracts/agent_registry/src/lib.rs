@@ -34,10 +34,12 @@
 
 mod errors;
 mod events;
-mod types;
+mod upgrade;
 
-pub use errors::Error;
-pub use types::*;
+#[cfg(test)]
+mod upgrade_tests;
+
+pub use upgrade::*;
 
 use events::{
     AdminChangedEvent, AgentDeregisteredEvent, AgentRegisteredEvent, ErrorReportedEvent,

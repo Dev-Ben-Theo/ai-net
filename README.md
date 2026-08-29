@@ -155,14 +155,26 @@ cd smart-contracts
 # Dry run to see what would be upgraded
 ./scripts/upgrade.sh --network testnet --dry-run
 
-# Upgrade specific contract
-./scripts/upgrade.sh --network testnet agent-registry
+# Upgrade specific contract using upgrade manager (recommended)
+./scripts/upgrade.sh --network testnet --use-upgrade-manager agent-registry
+
+# Upgrade to specific version
+./scripts/upgrade.sh --network testnet --use-upgrade-manager --version "1.2.0" agent-registry
 
 # Upgrade all contracts
-./scripts/upgrade.sh --network testnet
+./scripts/upgrade.sh --network testnet --use-upgrade-manager
 ```
 
-For detailed upgrade procedures and storage migration guidance, see [STORAGE_MIGRATION.md](smart-contracts/docs/STORAGE_MIGRATION.md).
+The upgrade system provides:
+- ✅ **Safe upgrades** with pre/post migration hooks
+- ✅ **Version compatibility** checking 
+- ✅ **48-hour rollback** window for emergency recovery
+- ✅ **Gas estimation** for migration operations
+- ✅ **Event tracking** for upgrade monitoring
+
+For detailed upgrade procedures and troubleshooting, see [UPGRADE_GUIDE.md](smart-contracts/docs/UPGRADE_GUIDE.md).
+
+For storage migration guidance, see [STORAGE_MIGRATION.md](smart-contracts/docs/STORAGE_MIGRATION.md).
 
 ### Database migration
 This branch does not include an automated migration runner. To apply the backend index migration, run the SQL script directly against your PostgreSQL database:
