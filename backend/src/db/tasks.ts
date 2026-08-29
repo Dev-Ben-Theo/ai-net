@@ -3,6 +3,7 @@ import path from "path";
 import type { Task, TaskStatus } from "../types/task";
 import type { QualityScoreRecord } from "../services/qualityScorer.types";
 import { createLogger } from "../utils/logger";
+import { encodeCursor, decodeCursor, type CursorPage } from "./cursor";
 
 const logger = createLogger({ component: "task-db" });
 
@@ -40,6 +41,7 @@ export function getTaskDb(dbPath?: string): Database.Database {
         timestamp TEXT    NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_task_events_taskId ON task_events (taskId);
+      CREATE INDEX IF NOT EXISTS idx_tasks_wallet_created ON tasks (walletPublicKey, createdAt DESC, id DESC);
       CREATE TABLE IF NOT EXISTS quality_scores (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
         taskId       TEXT    NOT NULL,
@@ -80,6 +82,16 @@ export interface TaskListOptions {
   createdAfter?: string;
 }
 
+export interface TaskCursorOptions {
+  /** Opaque cursor from a previous page's nextCursor field. */
+  cursor?: string;
+  /** Max items per page (1–100, default 20). */
+  limit?: number;
+  status?: string;
+  q?: string;
+  sort?: "createdAt:asc" | "createdAt:desc";
+}
+
 export interface TaskDb {
   insert(task: Task): void;
   findById(id: string): Task | undefined;
@@ -89,6 +101,14 @@ export interface TaskDb {
     pageSize: number,
     options?: TaskListOptions,
   ): { tasks: Task[]; total: number };
+  /**
+   * Cursor-based list — stable under concurrent writes.
+   * Default keyset: (createdAt DESC, id DESC).
+   */
+  listCursor(
+    walletPublicKey: string,
+    options?: TaskCursorOptions,
+  ): CursorPage<Task>;
   updateStatus(id: string, status: TaskStatus): void;
   updateDagJson(id: string, dagJson: string): void;
   insertEvent(event: TaskEvent): void;
@@ -135,20 +155,16 @@ export function createTaskDb(db: Database.Database): TaskDb {
         conditions.push("status = ?");
         params.push(options.status);
       }
-
       if (options.q) {
         conditions.push("prompt LIKE ?");
         params.push(`%${options.q}%`);
       }
-
       if (options.createdAfter) {
         conditions.push("createdAt > ?");
         params.push(options.createdAfter);
       }
 
       const whereClause = conditions.join(" AND ");
-
-      // Only allow safe sort values — default to DESC
       const sortOrder = options.sort === "createdAt:asc" ? "ASC" : "DESC";
 
       const rows = db
@@ -167,6 +183,66 @@ export function createTaskDb(db: Database.Database): TaskDb {
         .get(...params) as { total: number };
 
       return { tasks, total };
+    },
+
+    listCursor(
+      walletPublicKey: string,
+      options: TaskCursorOptions = {},
+    ): CursorPage<Task> {
+      const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
+      const sortOrder = options.sort === "createdAt:asc" ? "ASC" : "DESC";
+      // Keyset comparator flips based on sort direction
+      const keyOp = sortOrder === "DESC" ? "<" : ">";
+
+      const conditions: string[] = ["walletPublicKey = ?"];
+      const params: unknown[] = [walletPublicKey];
+
+      if (options.status) {
+        conditions.push("status = ?");
+        params.push(options.status);
+      }
+      if (options.q) {
+        conditions.push("prompt LIKE ?");
+        params.push(`%${options.q}%`);
+      }
+
+      let cursorCondition = "";
+      const cursorParams: unknown[] = [];
+
+      if (options.cursor) {
+        const payload = decodeCursor(options.cursor);
+        if (payload?.createdAt && payload?.id) {
+          // Compound keyset prevents instability when timestamps collide
+          cursorCondition = `AND (createdAt ${keyOp} ? OR (createdAt = ? AND id ${keyOp} ?))`;
+          cursorParams.push(payload.createdAt, payload.createdAt, payload.id);
+        }
+      }
+
+      const whereClause = conditions.join(" AND ");
+      // Fetch limit+1 to detect a next page without a COUNT query
+      const rows = db
+        .prepare(
+          `SELECT * FROM tasks
+           WHERE ${whereClause} ${cursorCondition}
+           ORDER BY createdAt ${sortOrder}, id ${sortOrder}
+           LIMIT ?`,
+        )
+        .all(...params, ...cursorParams, limit + 1) as any[];
+
+      const hasMore = rows.length > limit;
+      const pageRows = hasMore ? rows.slice(0, limit) : rows;
+
+      const tasks: Task[] = pageRows.map((row) => ({
+        ...row,
+        dag: JSON.parse(row.dagJson),
+      }));
+
+      const result: CursorPage<Task> = { items: tasks };
+      if (hasMore) {
+        const last = pageRows[pageRows.length - 1];
+        result.nextCursor = encodeCursor({ createdAt: last.createdAt, id: last.id });
+      }
+      return result;
     },
 
     updateStatus(id: string, status: TaskStatus): void {

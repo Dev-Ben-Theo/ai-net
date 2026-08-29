@@ -133,6 +133,15 @@ import { getAgentDb, createAgentDb, AgentDb } from "../../db/agents";
 import { heartbeatRateLimitMiddleware } from "../middleware/rateLimit";
 import { NotFoundError, ValidationError, AuthenticationError } from "../../errors";
 
+const AgentCursorListSchema = z.object({
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  capability: z.string().optional(),
+  minReputation: z.coerce.number().optional(),
+  maxPriceXLM: z.coerce.number().optional(),
+  status: z.enum(["online", "offline"]).optional(),
+});
+
 export interface AgentsRouterOptions {
   healthTimeoutMs?: number;
   db?: AgentDb;
@@ -204,13 +213,46 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
    *             schema:
    *               $ref: '#/components/schemas/InternalServerError'
    */
-  // GET /api/agents
+  // GET /api/agents — supports cursor pagination when ?cursor or ?limit present
   router.get("/", (req: Request, res: Response, next: NextFunction): void => {
     const db = getDb();
+    const useCursor = "cursor" in req.query || "limit" in req.query;
+
+    if (useCursor) {
+      const parse = AgentCursorListSchema.safeParse(req.query);
+      if (!parse.success) {
+        res.status(400).json({ error: parse.error.flatten() });
+        return;
+      }
+      const { cursor, limit, capability, minReputation, maxPriceXLM, status } = parse.data;
+      try {
+        const page = db.listCursor({ cursor, limit, capability, minReputation, maxPriceXLM, status });
+        res.json({
+          data: {
+            items: page.items,
+            pagination: {
+              limit,
+              nextCursor: page.nextCursor ?? null,
+              hasNextPage: !!page.nextCursor,
+            },
+          },
+          _links: {
+            self: `/api/agents`,
+            ...(page.nextCursor
+              ? { next: `/api/agents?cursor=${encodeURIComponent(page.nextCursor)}&limit=${limit}` }
+              : {}),
+          },
+        });
+      } catch (err) {
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+      return;
+    }
+
+    // Legacy flat-array response for backward compatibility
     const capability = req.query.capability as string | undefined;
     const minReputation = req.query.minReputation ? parseFloat(req.query.minReputation as string) : undefined;
     const maxPriceXLM = req.query.maxPriceXLM ? parseFloat(req.query.maxPriceXLM as string) : undefined;
-    
     try {
       const agents = db.list({ capability, minReputation, maxPriceXLM });
       res.json(agents);
