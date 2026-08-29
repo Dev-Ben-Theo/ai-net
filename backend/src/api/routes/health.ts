@@ -8,6 +8,7 @@
 import { Router } from 'express';
 import { config, ttlForRoute } from '../../config/index';
 import { cacheMiddleware } from '../middleware/cache';
+import { getAllFlags } from '../../services/featureFlags';
 
 const router = Router();
 
@@ -23,6 +24,7 @@ router.get(
       uptime: Math.floor((Date.now() - startTime) / 1000),
       version: process.env['npm_package_version'] ?? '0.1.0',
       stellarNetwork: config.STELLAR_NETWORK,
+      featureFlags: getAllFlags(),
     });
   },
 );

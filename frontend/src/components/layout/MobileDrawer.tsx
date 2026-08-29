@@ -2,6 +2,7 @@ import React, { forwardRef, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { motion, PanInfo } from 'framer-motion'
 import { LayoutDashboard, PlusCircle, Bot, Wallet, History } from 'lucide-react'
+import { backdrop, slideFromBottom } from '../../utils/animationPresets'
 import './MobileDrawer.css'
 
 export const NAV_ITEMS = [
@@ -91,20 +92,20 @@ const MobileDrawer = forwardRef<HTMLDivElement, MobileDrawerProps>(
       <>
         <motion.div
           className="drawer-backdrop"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          variants={backdrop}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
           onClick={onClose}
           aria-hidden="true"
         />
         <motion.div
           ref={combinedRef}
           className="mobile-drawer trap-focus"
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 30, stiffness: 400, duration: 0.18 }}
+          variants={slideFromBottom}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
           drag="y"
           dragConstraints={{ top: 0, bottom: 0 }}
           dragElastic={0.2}

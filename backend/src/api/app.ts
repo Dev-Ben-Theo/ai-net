@@ -151,6 +151,8 @@ import {
   type JobQueue,
 } from "../queue";
 import { createAdminQueueRouter } from "./routes/admin";
+import { createFlagsRouter } from "./routes/flags";
+import { createVersionsRouter } from "./routes/versions";
 
 export interface AppOptions {
   /** Called to execute a single DAG node; defaults to HTTP dispatch via agent registry */
@@ -307,6 +309,12 @@ export function createApp(opts: AppOptions = {}): {
   // ── Admin Queue routes ─────────────────────────────────────────────────────
   app.use("/api/admin/queue", createAdminQueueRouter(jobQueue));
   app.use("/api/admin", createAdminQueueRouter(jobQueue));
+
+  // ── Feature-flag admin routes (#425) ───────────────────────────────────────
+  app.use("/api/admin/flags", createFlagsRouter());
+
+  // ── Versioning lifecycle endpoint (#426) ───────────────────────────────────
+  app.use("/api/versions", createVersionsRouter());
 
   // ── Payment reconciliation routes ──────────────────────────────────────────
   app.use("/api/reconciliation", createReconciliationRouter(opts.reconciliation));
