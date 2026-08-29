@@ -6,6 +6,8 @@ import Sidebar from './Sidebar'
 import TopNav from './TopNav'
 import MobileDrawer from './MobileDrawer'
 import Breadcrumb from './Breadcrumb'
+import RouteProgressBar from './RouteProgressBar'
+import { useRouteProgress } from '../../hooks/useRouteProgress'
 import './AppShell.css'
 
 interface AppShellProps {
@@ -21,6 +23,9 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const drawerRef = useRef<HTMLDivElement>(null)
+
+  // Drive the global progress bar on every route change
+  useRouteProgress()
 
   useEffect(() => {
     if (isMobile === false) {
@@ -70,6 +75,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
   return (
     <div className="app-shell">
+      <RouteProgressBar />
       <a href="#main-content" className="skip-to-content">
         Skip to content
       </a>

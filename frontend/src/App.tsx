@@ -6,6 +6,7 @@ import { WalletProvider } from './context/WalletContext'
 import { ToastProvider } from './context/ToastContext'
 import { NotificationProvider } from './context/NotificationContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { RouteProgressProvider } from './context/RouteProgressContext'
 import { NotFoundPage } from './pages/NotFoundPage'
 import AppShell from './components/layout/AppShell'
 import LandingPage from './pages/LandingPage'
@@ -109,9 +110,11 @@ const App: React.FC = () => {
         <ThemeProvider>
           <WalletProvider>
             <ToastProvider>
-              <Router>
-                <AppContent />
-              </Router>
+              <RouteProgressProvider>
+                <Router>
+                  <AppContent />
+                </Router>
+              </RouteProgressProvider>
             </ToastProvider>
           </WalletProvider>
         </ThemeProvider>
