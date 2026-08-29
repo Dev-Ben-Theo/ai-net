@@ -32,8 +32,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   }
 
   return (
-    <aside 
+    <aside
       className={`sidebar ${collapsed ? 'collapsed' : ''}`}
+      aria-label={t('a11y.sidebar')}
     >
       <nav className="sidebar-nav" role="navigation" aria-label={t('a11y.mainNavigation')}>
         <ul>

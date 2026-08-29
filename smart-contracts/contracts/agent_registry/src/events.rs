@@ -174,6 +174,52 @@ pub struct ErrorResolvedEvent {
     pub resolution_code: u32,
 }
 
+// ─── Attestation event data structs ──────────────────────────────────────────
+
+/// Data payload for `(registry, att_created)`.
+///
+/// Published when a new capability attestation is successfully created via
+/// `attest_capability`. Includes the expiry timestamp so indexers can schedule
+/// automatic expiry events without polling.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct AttestationCreatedEvent {
+    /// The agent this attestation is for.
+    pub agent_id: Symbol,
+    /// The capability being attested.
+    pub capability: Symbol,
+    /// Address of the signer who produced the attestation.
+    pub signer: Address,
+    /// Ledger timestamp when the attestation expires.
+    pub expires_at: u64,
+}
+
+/// Data payload for `(registry, att_revoked)`.
+///
+/// Published when an agent owner revokes their own attestation via
+/// `revoke_attestation`.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct AttestationRevokedEvent {
+    /// The agent whose attestation was revoked.
+    pub agent_id: Symbol,
+    /// The capability that was attested.
+    pub capability: Symbol,
+}
+
+/// Data payload for `(registry, att_expired)`.
+///
+/// Published by `verify_attestation` when it detects an expired attestation.
+/// Off-chain indexers can subscribe to this to track expiry events.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct AttestationExpiredEvent {
+    /// The agent whose attestation expired.
+    pub agent_id: Symbol,
+    /// The capability that was attested.
+    pub capability: Symbol,
+}
+
 // ─── Bond event data structs ──────────────────────────────────────────────────
 
 /// Data payload for `(registry, bond_locked)`.
@@ -222,4 +268,131 @@ pub struct BondReturned {
     pub owner: Address,
     /// Bond amount returned in stroops.
     pub amount_stroops: i128,
+}
+
+// ─── Multi-sig Administration Event Data Structs ──────────────────────────────
+
+/// Data payload for `(registry, op_prop)`.
+/// Published when a multi-sig proposal is submitted.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct OperationProposed {
+    pub proposal_id: u64,
+    pub proposer: Address,
+    pub action: Symbol,
+    pub eta: u64,
+    pub expires_at: u64,
+}
+
+/// Data payload for `(registry, op_appr)`.
+/// Published when an admin approves a proposal.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct OperationApproved {
+    pub proposal_id: u64,
+    pub approver: Address,
+}
+
+/// Data payload for `(registry, op_exec)`.
+/// Published when a proposal is executed after timelock.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct OperationExecuted {
+    pub proposal_id: u64,
+    pub executor: Address,
+}
+
+/// Data payload for `(registry, op_canc)`.
+/// Published when a proposal is cancelled by its proposer.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct OperationCancelled {
+    pub proposal_id: u64,
+    pub canceller: Address,
+}
+
+/// Data payload for `(registry, disc_qry)`.
+/// Published when a discovery query is processed by the oracle.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct DiscoveryQueryEvent {
+    /// Required capability requested in the discovery query.
+    pub capability: Symbol,
+    /// Maximum acceptable price in stroops.
+    pub max_price: i128,
+    /// Minimum acceptable reputation score [0, 100].
+    pub min_reputation: u32,
+    /// Maximum acceptable response time / latency in milliseconds.
+    pub max_latency: u32,
+    /// Number of matching agents discovered and ranked.
+    pub matches_count: u32,
+}
+
+// ─── Analytics Event Data Structs ────────────────────────────────────────────
+
+/// Data payload for `(registry, analytics_rec)`.
+/// Published when task completion is recorded for an agent.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct AnalyticsRecordedEvent {
+    /// Agent whose analytics were updated.
+    pub agent_id: Symbol,
+    /// Whether the task was successful.
+    pub success: bool,
+    /// Response time for this task in milliseconds.
+    pub response_time: u32,
+    /// Earnings from this task in stroops.
+    pub earnings: i128,
+}
+
+/// Data payload for `(registry, lb_upd)`.
+/// Published when the leaderboard is updated.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct LeaderboardUpdatedEvent {
+    /// Metric used for ranking.
+    pub metric: Symbol,
+    /// Top N agents returned.
+    pub top_count: u32,
+}
+
+// ─── SLA Event Data Structs ──────────────────────────────────────────────────
+
+/// Data payload for `(registry, sla_set)`.
+/// Published when an agent's SLA is configured.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct SlaSetEvent {
+    /// Agent the SLA was set for.
+    pub agent_id: Symbol,
+    /// Maximum response time in milliseconds.
+    pub max_response_time: u32,
+    /// Minimum uptime percentage.
+    pub min_uptime: u32,
+    /// Minimum quality score.
+    pub min_quality_score: u32,
+}
+
+/// Data payload for `(registry, sla_viol)`.
+/// Published when an SLA violation is detected.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct SlaViolationDetectedEvent {
+    /// Agent that violated the SLA.
+    pub agent_id: Symbol,
+    /// Type of violation: 0 = response_time, 1 = uptime, 2 = quality.
+    pub violation_type: u32,
+    /// Penalty applied (stroops).
+    pub penalty_stroops: i128,
+}
+
+/// Data payload for `(registry, sla_bonus)`.
+/// Published when an agent receives a bonus for exceeding SLA.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct SlaBonusAwardedEvent {
+    /// Agent that received the bonus.
+    pub agent_id: Symbol,
+    /// Reputation boost awarded.
+    pub reputation_boost: u32,
 }

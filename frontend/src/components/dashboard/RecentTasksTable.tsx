@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Skeleton } from '../common/Skeleton';
 import styles from './RecentTasksTable.module.css';
 import { getRecentTasks } from '@services/api';
+import { useToast } from '../../hooks/useToast';
 import { useToast } from '../../context/ToastContext';
 import type { TaskResponse } from '../../types/api';
 import { formatDateTime } from '../../utils/format';
@@ -29,6 +30,9 @@ export const RecentTasksTable: React.FC<Props> = ({ walletAddress, loading }) =>
         }));
         setTasks(mappedTasks);
       } catch (e) {
+        const message = e instanceof Error ? e.message : 'Failed to load recent tasks.';
+        showToast(message, 'error');
+        showToast('Failed to fetch recent tasks', 'error');
         // i18n.t (not the captured t) so the toast always uses the current
         // language without putting t in the deps, which would refetch on every
         // language change.

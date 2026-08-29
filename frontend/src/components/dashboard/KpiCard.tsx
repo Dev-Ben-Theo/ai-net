@@ -51,7 +51,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({ title, value, sparklineData, l
       ) : (
         <div className={styles.value}>{value}</div>
       )}
-      <div className={styles.sparkline}>
+      <div className={styles.sparkline} aria-hidden="true">
         <ResponsiveContainer width="100%" height={40}>
           <AreaChart data={data} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
             <defs>

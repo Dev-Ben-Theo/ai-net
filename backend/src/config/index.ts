@@ -56,6 +56,45 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .transform((v) => v === "true")
     .default("true"),
+
+  // ── API Versioning ──────────────────────────────────────────────────────────
+  /** Latest API version. Default: "2.0". */
+  API_LATEST_VERSION: z.string().default("2.0"),
+  /** Supported API versions (comma-separated). Default: "1.0,1.1,2.0". */
+  API_SUPPORTED_VERSIONS: z.string().default("1.0,1.1,2.0"),
+  /** Default API version when no header is provided. Default: "1.0" for backward compatibility. */
+  API_DEFAULT_VERSION: z.string().default("1.0"),
+  /** Sunset date for deprecated API versions (ISO 8601 format). Optional. */
+  API_V1_SUNSET_DATE: z.string().optional(),
+
+  // ── Admin API ───────────────────────────────────────────────────────────────
+  /**
+   * Shared secret required by admin-only endpoints such as
+   * `GET /health/dashboard`. Sent as `X-Admin-API-Key: <key>` or
+   * `Authorization: Bearer <key>`. When unset, those endpoints refuse every
+   * request with 503 rather than falling open.
+   */
+  ADMIN_API_KEY: z.string().min(1).optional(),
+
+  // ── WebSocket Stream ────────────────────────────────────────────────────────
+  /** Maximum concurrent WebSocket connections per client IP. Default: 5. */
+  WS_MAX_CONNECTIONS_PER_CLIENT: z.coerce.number().int().positive().default(5),
+  /** Maximum messages per minute per WebSocket connection. Default: 100. */
+  WS_MAX_MESSAGES_PER_MINUTE: z.coerce.number().int().positive().default(100),
+  /** Auto-disconnect after N ms of inactivity. Default: 1800000 (30 min). */
+  WS_INACTIVITY_TIMEOUT_MS: z.coerce.number().int().positive().default(1_800_000),
+  /** Heartbeat ping interval in ms. Default: 30000 (30 s). */
+  WS_HEARTBEAT_INTERVAL_MS: z.coerce.number().int().positive().default(30_000),
+  /** Pong timeout before marking connection stale. Default: 10000 (10 s). */
+  WS_PONG_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+
+  // ── Health dashboard metrics ────────────────────────────────────────────────
+  /** How long a dashboard snapshot is served before recollection. Default: 5 000 (5 s). */
+  METRICS_CACHE_TTL_MS: z.coerce.number().int().positive().default(5_000),
+  /** Rolling window used for request rate/latency/error analytics. Default: 60 000 (1 min). */
+  METRICS_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  /** Maximum request samples retained in memory. Default: 1 000. */
+  METRICS_MAX_SAMPLES: z.coerce.number().int().positive().default(1_000),
 });
 
 
