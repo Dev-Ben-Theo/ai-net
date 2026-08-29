@@ -111,6 +111,11 @@ pub const SLA_PENALTY_PERCENT: i128 = 10;
 /// SLA bonus reputation boost (5 points).
 pub const SLA_BONUS_REPUTATION_BOOST: u32 = 5;
 
+/// Default page size for cursor-based agent pagination (issue #339).
+pub const DEFAULT_PAGE_SIZE: u32 = 20;
+/// Maximum upper bound on page size to guarantee execution within one ledger footprint budget.
+pub const MAX_PAGE_SIZE: u32 = 50;
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /// Input / stored agent record.
@@ -126,6 +131,18 @@ pub struct AgentRecord {
     /// XLM bond locked at registration time, in stroops.
     /// Must be ≥ the contract's `min_bond` setting (default: 100_000_000 = 10 XLM).
     pub bond_amount: i128,
+}
+
+/// Paginated response for agent listing (issue #339).
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AgentPage {
+    /// List of agents on the current page.
+    pub agents: Vec<AgentRecord>,
+    /// Cursor to fetch the next page, or `None` if this is the last page.
+    pub next_cursor: Option<u32>,
+    /// Total active agents currently in the registry.
+    pub total_count: u32,
 }
 
 /// Aggregate view of an agent's standing, including its error count as
@@ -253,6 +270,9 @@ pub enum DataKey {
     AgentSla(Symbol),
     SlaViolation(Symbol, u64),
     SlaViolationCount(Symbol),
+    // Pagination keys (issue #339)
+    AgentByIndex(u32),
+    RegistrationSequence,
 }
 
 /// Per-item outcome for batch registration (`Ok(agent_id)` / `Err(code)`).
@@ -310,6 +330,13 @@ fn get_total_agents(env: &Env) -> u32 {
     env.storage()
         .instance()
         .get(&DataKey::TotalAgents)
+        .unwrap_or(0)
+}
+
+fn get_registration_sequence(env: &Env) -> u32 {
+    env.storage()
+        .instance()
+        .get(&DataKey::RegistrationSequence)
         .unwrap_or(0)
 }
 
@@ -922,6 +949,14 @@ impl AgentRegistryContract {
         env.storage().persistent().set(&agent_key, &record);
         extend_ttl_for_key(&env, &agent_key);
 
+        let seq = get_registration_sequence(&env);
+        let index_key = DataKey::AgentByIndex(seq);
+        env.storage().persistent().set(&index_key, &record.id);
+        extend_ttl_for_key(&env, &index_key);
+        env.storage()
+            .instance()
+            .set(&DataKey::RegistrationSequence, &(seq + 1));
+
         let total = get_total_agents(&env);
         env.storage()
             .instance()
@@ -1064,12 +1099,17 @@ impl AgentRegistryContract {
 
         // ── Phase 3: commit all writes + batched TTL extension ───────────────
         let mut ttl_keys: Vec<DataKey> = Vec::new(&env);
+        let mut seq = get_registration_sequence(&env);
         for i in 0..agents.len() {
             let record = agents.get(i).unwrap();
             let agent_key = DataKey::Agent(record.id.clone());
+            let index_key = DataKey::AgentByIndex(seq);
             append_capability_index(&env, &record.capability, &record.id);
             env.storage().persistent().set(&agent_key, &record);
+            env.storage().persistent().set(&index_key, &record.id);
             ttl_keys.push_back(agent_key);
+            ttl_keys.push_back(index_key);
+            seq += 1;
 
             // Emit one (registry, agent_registered) event per committed agent.
             // Batch callers receive the same event shape as single registration,
@@ -1095,6 +1135,9 @@ impl AgentRegistryContract {
                 },
             );
         }
+        env.storage()
+            .instance()
+            .set(&DataKey::RegistrationSequence, &seq);
         let current_total = get_total_agents(&env);
         env.storage()
             .instance()
@@ -1129,6 +1172,58 @@ impl AgentRegistryContract {
         // Batch-extend TTLs for every agent loaded in this lookup.
         extend_ttl_batch(&env, &ttl_keys);
         records
+    }
+
+    /// Cursor-based paginated agent listing with upper bound on page size (issue #339).
+    ///
+    /// - `cursor`: Starting registration sequence index (defaults to 0 if `None`).
+    /// - `limit`: Number of items requested (defaults to [`DEFAULT_PAGE_SIZE`], capped at [`MAX_PAGE_SIZE`]).
+    ///
+    /// Returns [`AgentPage`] containing matching agents, `next_cursor` for subsequent page,
+    /// and `total_count` of active registered agents.
+    pub fn get_agents(env: Env, cursor: Option<u32>, limit: Option<u32>) -> AgentPage {
+        let start_cursor = cursor.unwrap_or(0);
+        let requested_limit = limit.unwrap_or(DEFAULT_PAGE_SIZE);
+        let effective_limit = if requested_limit == 0 {
+            DEFAULT_PAGE_SIZE
+        } else if requested_limit > MAX_PAGE_SIZE {
+            MAX_PAGE_SIZE
+        } else {
+            requested_limit
+        };
+
+        let total_registered = get_registration_sequence(&env);
+        let total_active = get_total_agents(&env);
+
+        let mut agents = Vec::new(&env);
+        let mut current_idx = start_cursor;
+        let mut ttl_keys: Vec<DataKey> = Vec::new(&env);
+
+        while current_idx < total_registered && agents.len() < effective_limit {
+            let index_key = DataKey::AgentByIndex(current_idx);
+            if let Some(agent_id) = env.storage().persistent().get::<_, Symbol>(&index_key) {
+                let agent_key = DataKey::Agent(agent_id);
+                if let Some(record) = env.storage().persistent().get::<_, AgentRecord>(&agent_key) {
+                    ttl_keys.push_back(agent_key);
+                    agents.push_back(record);
+                }
+            }
+            current_idx += 1;
+        }
+
+        extend_ttl_batch(&env, &ttl_keys);
+
+        let next_cursor = if current_idx < total_registered {
+            Some(current_idx)
+        } else {
+            None
+        };
+
+        AgentPage {
+            agents,
+            next_cursor,
+            total_count: total_active,
+        }
     }
 
     /// Discover and rank agents matching multi-criteria criteria:
