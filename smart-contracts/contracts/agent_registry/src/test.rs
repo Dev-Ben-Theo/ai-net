@@ -1653,3 +1653,436 @@ fn test_non_admin_cannot_set_storage_config() {
     let res = client.try_set_storage_config(&cfg);
     assert!(res.is_err());
 }
+
+// ── On-Chain Analytics Tests (issue #254) ──────────────────────────────────
+
+#[test]
+fn record_task_completion_success() {
+    let (env, client) = setup();
+    let agent_id = Symbol::new(&env, "agent1");
+
+    client.record_task_completion(&agent_id, &true, &150, &1_000_000_i128);
+
+    let analytics = client.get_analytics(&agent_id);
+    assert_eq!(analytics.total_tasks, 1);
+    assert_eq!(analytics.successful_tasks, 1);
+    assert_eq!(analytics.failed_tasks, 0);
+    assert_eq!(analytics.total_earnings, 1_000_000);
+    assert_eq!(analytics.avg_response_time, 150);
+}
+
+#[test]
+fn record_task_completion_failure() {
+    let (env, client) = setup();
+    let agent_id = Symbol::new(&env, "agent1");
+
+    client.record_task_completion(&agent_id, &false, &500, &0_i128);
+
+    let analytics = client.get_analytics(&agent_id);
+    assert_eq!(analytics.total_tasks, 1);
+    assert_eq!(analytics.successful_tasks, 0);
+    assert_eq!(analytics.failed_tasks, 1);
+    assert_eq!(analytics.total_earnings, 0);
+}
+
+#[test]
+fn record_task_completion_running_average() {
+    let (env, client) = setup();
+    let agent_id = Symbol::new(&env, "agent1");
+
+    client.record_task_completion(&agent_id, &true, &100, &1_000_000_i128);
+    client.record_task_completion(&agent_id, &true, &200, &1_000_000_i128);
+    client.record_task_completion(&agent_id, &true, &300, &1_000_000_i128);
+
+    let analytics = client.get_analytics(&agent_id);
+    assert_eq!(analytics.total_tasks, 3);
+    assert_eq!(analytics.avg_response_time, 200);
+    assert_eq!(analytics.total_earnings, 3_000_000);
+}
+
+#[test]
+fn get_leaderboard_by_total_tasks() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+
+    // Register agents
+    client.register_agent(&make_record(&env, "a1", "analytics", owner.clone()));
+    client.register_agent(&make_record(&env, "a2", "analytics", owner.clone()));
+    client.register_agent(&make_record(&env, "a3", "analytics", owner.clone()));
+
+    // Record tasks
+    client.record_task_completion(&Symbol::new(&env, "a1"), &true, &100, &1_000_000_i128);
+    client.record_task_completion(&Symbol::new(&env, "a1"), &true, &100, &1_000_000_i128);
+    client.record_task_completion(&Symbol::new(&env, "a2"), &true, &100, &1_000_000_i128);
+    client.record_task_completion(&Symbol::new(&env, "a3"), &true, &100, &1_000_000_i128);
+    client.record_task_completion(&Symbol::new(&env, "a3"), &true, &100, &1_000_000_i128);
+    client.record_task_completion(&Symbol::new(&env, "a3"), &true, &100, &1_000_000_i128);
+
+    let metric = Symbol::new(&env, "total_tasks");
+    let leaderboard = client.get_leaderboard(&metric, &3);
+
+    assert_eq!(leaderboard.len(), 3);
+    assert_eq!(leaderboard.get(0).unwrap().agent_id, Symbol::new(&env, "a3"));
+    assert_eq!(leaderboard.get(0).unwrap().metric_value, 3);
+    assert_eq!(leaderboard.get(1).unwrap().agent_id, Symbol::new(&env, "a1"));
+    assert_eq!(leaderboard.get(1).unwrap().metric_value, 2);
+}
+
+#[test]
+fn get_leaderboard_emits_event() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+    client.register_agent(&make_record(&env, "a1", "analytics", owner));
+
+    let metric = Symbol::new(&env, "total_tasks");
+    client.get_leaderboard(&metric, &10);
+
+    let events = env.events().all();
+    let last = events.get(events.len() - 1).unwrap();
+    let (_, topics, _) = last;
+    let t1 = Symbol::from_val(&env, &topics.get(1).unwrap());
+    assert_eq!(t1, symbol_short!("lb_upd"));
+}
+
+// ── SLA Enforcement Tests (issue #257) ────────────────────────────────────
+
+#[test]
+fn set_sla_success() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+    client.register_agent(&make_record(&env, "sla_agent", "research", owner));
+
+    client.set_sla(
+        &Symbol::new(&env, "sla_agent"),
+        &200,
+        &95,
+        &80,
+    );
+
+    let sla = client.get_sla_status(&Symbol::new(&env, "sla_agent"));
+    assert!(sla.is_some());
+    let (sla, compliance) = sla.unwrap();
+    assert_eq!(sla.max_response_time, 200);
+    assert_eq!(sla.min_uptime, 95);
+    assert_eq!(sla.min_quality_score, 80);
+    assert_eq!(compliance, 100);
+}
+
+#[test]
+fn set_sla_nonexistent_agent() {
+    let (env, client) = setup();
+    assert_eq!(
+        client.try_set_sla(&Symbol::new(&env, "ghost"), &200, &95, &80),
+        Err(Ok(Error::NotFound))
+    );
+}
+
+#[test]
+fn set_sla_duplicate_fails() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+    client.register_agent(&make_record(&env, "sla_agent", "research", owner));
+
+    client.set_sla(&Symbol::new(&env, "sla_agent"), &200, &95, &80);
+
+    assert_eq!(
+        client.try_set_sla(&Symbol::new(&env, "sla_agent"), &300, &90, &70),
+        Err(Ok(Error::SlaAlreadyExists))
+    );
+}
+
+#[test]
+fn set_sla_invalid_params() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+    client.register_agent(&make_record(&env, "sla_agent", "research", owner));
+
+    // max_response_time = 0
+    assert_eq!(
+        client.try_set_sla(&Symbol::new(&env, "sla_agent"), &0, &95, &80),
+        Err(Ok(Error::InvalidSla))
+    );
+
+    // min_uptime > 100
+    assert_eq!(
+        client.try_set_sla(&Symbol::new(&env, "sla_agent"), &200, &101, &80),
+        Err(Ok(Error::InvalidSla))
+    );
+
+    // min_quality_score > 100
+    assert_eq!(
+        client.try_set_sla(&Symbol::new(&env, "sla_agent"), &200, &95, &101),
+        Err(Ok(Error::InvalidSla))
+    );
+}
+
+#[test]
+fn check_sla_compliance_pass() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+    client.register_agent(&make_record(&env, "sla_agent", "research", owner));
+
+    client.set_sla(&Symbol::new(&env, "sla_agent"), &200, &95, &80);
+
+    let compliant = client.check_sla_compliance(
+        &Symbol::new(&env, "sla_agent"),
+        &150, // response time < 200
+        &98,  // uptime > 95
+        &90,  // quality > 80
+    );
+    assert!(compliant);
+
+    let sla = client.get_sla_status(&Symbol::new(&env, "sla_agent")).unwrap();
+    assert_eq!(sla.0.total_checks, 1);
+    assert_eq!(sla.0.violations, 0);
+    assert_eq!(sla.1, 100);
+}
+
+#[test]
+fn check_sla_compliance_violation() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+    client.register_agent(&make_record(&env, "sla_agent", "research", owner));
+
+    client.set_sla(&Symbol::new(&env, "sla_agent"), &200, &95, &80);
+
+    let compliant = client.check_sla_compliance(
+        &Symbol::new(&env, "sla_agent"),
+        &300, // response time > 200 - violation!
+        &98,
+        &90,
+    );
+    assert!(!compliant);
+
+    let sla = client.get_sla_status(&Symbol::new(&env, "sla_agent")).unwrap();
+    assert_eq!(sla.0.violations, 1);
+    assert_eq!(sla.1, 0); // 0% compliance with 1 check and 1 violation
+}
+
+#[test]
+fn check_sla_compliance_uptime_violation() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+    client.register_agent(&make_record(&env, "sla_agent", "research", owner));
+
+    client.set_sla(&Symbol::new(&env, "sla_agent"), &200, &95, &80);
+
+    let compliant = client.check_sla_compliance(
+        &Symbol::new(&env, "sla_agent"),
+        &100,  // ok
+        &80,   // uptime < 95 - violation!
+        &90,
+    );
+    assert!(!compliant);
+}
+
+#[test]
+fn check_sla_compliance_quality_violation() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+    client.register_agent(&make_record(&env, "sla_agent", "research", owner));
+
+    client.set_sla(&Symbol::new(&env, "sla_agent"), &200, &95, &80);
+
+    let compliant = client.check_sla_compliance(
+        &Symbol::new(&env, "sla_agent"),
+        &100,
+        &98,
+        &70, // quality < 80 - violation!
+    );
+    assert!(!compliant);
+}
+
+#[test]
+fn sla_compliance_emits_violation_event() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+    client.register_agent(&make_record(&env, "sla_agent", "research", owner));
+
+    client.set_sla(&Symbol::new(&env, "sla_agent"), &200, &95, &80);
+
+    let initial_events = env.events().all().len();
+    client.check_sla_compliance(
+        &Symbol::new(&env, "sla_agent"),
+        &300, // violation
+        &98,
+        &90,
+    );
+
+    let events = env.events().all();
+    assert!(events.len() > initial_events);
+}
+
+#[test]
+fn sla_bonus_awarded_after_consistent_compliance() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+    client.register_agent(&make_record(&env, "sla_agent", "research", owner));
+
+    client.set_sla(&Symbol::new(&env, "sla_agent"), &200, &95, &80);
+
+    // Record 10 compliant checks
+    for _ in 0..10 {
+        client.check_sla_compliance(
+            &Symbol::new(&env, "sla_agent"),
+            &100,
+            &99,
+            &95,
+        );
+    }
+
+    let sla = client.get_sla_status(&Symbol::new(&env, "sla_agent")).unwrap();
+    assert_eq!(sla.0.total_checks, 10);
+    assert_eq!(sla.0.violations, 0);
+    assert_eq!(sla.1, 100); // 100% compliance
+}
+
+#[test]
+fn sla_violation_penalty_slashes_bond() {
+    let (env, client, _admin) = setup_with_admin();
+    let owner = Address::generate(&env);
+    client.register_agent(&make_record(&env, "sla_agent", "research", owner));
+
+    let initial_bond = client
+        .lookup_agents(&Symbol::new(&env, "research"))
+        .get(0)
+        .unwrap()
+        .bond_amount;
+
+    client.set_sla(&Symbol::new(&env, "sla_agent"), &200, &95, &80);
+
+    client.check_sla_compliance(
+        &Symbol::new(&env, "sla_agent"),
+        &300, // violation
+        &98,
+        &90,
+    );
+
+    let remaining_bond = client
+        .lookup_agents(&Symbol::new(&env, "research"))
+        .get(0)
+        .unwrap()
+        .bond_amount;
+
+    let expected_penalty = initial_bond * SLA_PENALTY_PERCENT / 100;
+    assert_eq!(remaining_bond, initial_bond - expected_penalty);
+}
+
+// ─── Pagination Tests (Issue #339) ──────────────────────────────────────────
+
+#[test]
+fn test_get_agents_empty_registry() {
+    let (env, client) = setup();
+    let page = client.get_agents(&None, &None);
+    assert_eq!(page.agents.len(), 0);
+    assert_eq!(page.next_cursor, None);
+    assert_eq!(page.total_count, 0);
+}
+
+#[test]
+fn test_get_agents_single_page() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+
+    client.register_agent(&make_record(&env, "agent_1", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_2", "research", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_3", "design", owner.clone()));
+
+    let page = client.get_agents(&None, &Some(10));
+    assert_eq!(page.agents.len(), 3);
+    assert_eq!(page.next_cursor, None);
+    assert_eq!(page.total_count, 3);
+    assert_eq!(page.agents.get(0).unwrap().id, Symbol::new(&env, "agent_1"));
+    assert_eq!(page.agents.get(1).unwrap().id, Symbol::new(&env, "agent_2"));
+    assert_eq!(page.agents.get(2).unwrap().id, Symbol::new(&env, "agent_3"));
+}
+
+#[test]
+fn test_get_agents_cursor_pagination() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+
+    // Register 7 agents
+    client.register_agent(&make_record(&env, "agent_1", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_2", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_3", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_4", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_5", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_6", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_7", "code", owner.clone()));
+
+    assert_eq!(client.total_agents(), 7);
+
+    // Page 1: limit 3
+    let page1 = client.get_agents(&None, &Some(3));
+    assert_eq!(page1.agents.len(), 3);
+    assert_eq!(page1.total_count, 7);
+    assert_eq!(page1.next_cursor, Some(3));
+    assert_eq!(page1.agents.get(0).unwrap().id, Symbol::new(&env, "agent_1"));
+    assert_eq!(page1.agents.get(1).unwrap().id, Symbol::new(&env, "agent_2"));
+    assert_eq!(page1.agents.get(2).unwrap().id, Symbol::new(&env, "agent_3"));
+
+    // Page 2: cursor 3, limit 3
+    let page2 = client.get_agents(&page1.next_cursor, &Some(3));
+    assert_eq!(page2.agents.len(), 3);
+    assert_eq!(page2.total_count, 7);
+    assert_eq!(page2.next_cursor, Some(6));
+    assert_eq!(page2.agents.get(0).unwrap().id, Symbol::new(&env, "agent_4"));
+    assert_eq!(page2.agents.get(1).unwrap().id, Symbol::new(&env, "agent_5"));
+    assert_eq!(page2.agents.get(2).unwrap().id, Symbol::new(&env, "agent_6"));
+
+    // Page 3: cursor 6, limit 3 -> last remaining agent
+    let page3 = client.get_agents(&page2.next_cursor, &Some(3));
+    assert_eq!(page3.agents.len(), 1);
+    assert_eq!(page3.total_count, 7);
+    assert_eq!(page3.next_cursor, None);
+    assert_eq!(page3.agents.get(0).unwrap().id, Symbol::new(&env, "agent_7"));
+}
+
+#[test]
+fn test_get_agents_stable_boundaries_under_deregistration() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+
+    client.register_agent(&make_record(&env, "agent_1", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_2", "code", owner.clone()));
+    client.register_agent(&make_record(&env, "agent_3", "code", owner.clone()));
+
+    // Deregister agent_2
+    client.deregister_agent(&Symbol::new(&env, "agent_2"));
+    assert_eq!(client.total_agents(), 2);
+
+    // Listing with limit 10 returns active agents (agent_1, agent_3) and total_count = 2
+    let page = client.get_agents(&None, &Some(10));
+    assert_eq!(page.agents.len(), 2);
+    assert_eq!(page.total_count, 2);
+    assert_eq!(page.next_cursor, None);
+    assert_eq!(page.agents.get(0).unwrap().id, Symbol::new(&env, "agent_1"));
+    assert_eq!(page.agents.get(1).unwrap().id, Symbol::new(&env, "agent_3"));
+}
+
+#[test]
+fn test_get_agents_batch_registered_pagination() {
+    let (env, client) = setup();
+    let owner = Address::generate(&env);
+
+    let mut batch = soroban_sdk::Vec::new(&env);
+    batch.push_back(make_record(&env, "batch_1", "code", owner.clone()));
+    batch.push_back(make_record(&env, "batch_2", "code", owner.clone()));
+    batch.push_back(make_record(&env, "batch_3", "code", owner.clone()));
+    batch.push_back(make_record(&env, "batch_4", "code", owner.clone()));
+
+    let results = client.register_agents(&batch);
+    assert_eq!(results.len(), 4);
+
+    let page1 = client.get_agents(&Some(0), &Some(2));
+    assert_eq!(page1.agents.len(), 2);
+    assert_eq!(page1.next_cursor, Some(2));
+    assert_eq!(page1.total_count, 4);
+
+    let page2 = client.get_agents(&page1.next_cursor, &Some(2));
+    assert_eq!(page2.agents.len(), 2);
+    assert_eq!(page2.next_cursor, None);
+    assert_eq!(page2.total_count, 4);
+}
+

@@ -14,6 +14,11 @@ export class ApiError extends Error {
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
+const notifyToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', duration?: number) => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('app-toast', { detail: { message, type, duration } }));
+};
+
 const getAuthHeader = (): Record<string, string> => {
   const pubKey = localStorage.getItem('wallet_pubkey') || localStorage.getItem('walletAddress');
   return pubKey ? { 'Authorization': `Bearer ${pubKey}` } : {};
@@ -46,11 +51,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     if (response.status === 503 && retryCount < maxRetries) {
       const waitTime = baseDelay * Math.pow(2, retryCount);
       retryCount++;
+      notifyToast('Service is temporarily unavailable. Retrying...', 'warning', 4000);
       await new Promise(resolve => setTimeout(resolve, waitTime));
       continue;
     }
 
     if (response.status === 401) {
+      notifyToast('Your wallet session expired. Please reconnect.', 'warning', 5000);
       window.dispatchEvent(new CustomEvent('wallet_disconnected'));
     }
 
@@ -113,4 +120,8 @@ export const getRecentTasks = async (walletAddress: string): Promise<TaskRespons
 
 export const getAgents = async (): Promise<AgentRecord[]> => {
   return apiClient.get<AgentRecord[]>('/api/agents');
+};
+
+export const getAgentReputation = async (id: string): Promise<import('../types/agent').AgentReputation> => {
+  return apiClient.get<import('../types/agent').AgentReputation>(`/api/agents/${id}/reputation`);
 };

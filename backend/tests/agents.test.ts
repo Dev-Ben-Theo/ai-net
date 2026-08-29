@@ -5,6 +5,7 @@ import { createAgentsRouter } from "../src/api/routes/agents";
 import { createTasksRouter } from "../src/api/routes/tasks";
 import { AgentRecord, createAgentDb } from "../src/db/agents";
 import Database from "better-sqlite3";
+import { errorHandler } from "../src/api/middleware/errorHandler";
 
 const codingAgent: AgentRecord = {
   id: "coding-1",
@@ -38,6 +39,7 @@ function createTestApp(initialAgents: AgentRecord[] = [], healthTimeoutMs = 500)
   const app = express();
   app.use(express.json());
   app.use("/api/agents", createAgentsRouter({ db, healthTimeoutMs }));
+  app.use(errorHandler);
   return app;
 }
 
@@ -77,7 +79,7 @@ describe("Agents API route", () => {
     const response = await request(createTestApp()).get("/api/agents/missing");
 
     expect(response.status).toBe(404);
-    expect(response.body).toEqual({ error: "Agent not found" });
+    expect(response.body.error.message).toBe("Agent 'missing' not found");
   });
 
   it("returns healthy status and latency for a reachable agent endpoint", async () => {
@@ -124,7 +126,7 @@ describe("Agents API route", () => {
     const response = await request(createTestApp()).get("/api/agents/missing/health");
 
     expect(response.status).toBe(404);
-    expect(response.body).toEqual({ error: "Agent not found" });
+    expect(response.body.error.message).toBe("Agent 'missing' not found");
   });
 
   it("returns 200 and updates lastSeenAt on heartbeat", async () => {
@@ -146,7 +148,7 @@ describe("Agents API route", () => {
     const response = await request(createTestApp()).post("/api/agents/missing/heartbeat");
 
     expect(response.status).toBe(404);
-    expect(response.body).toEqual({ error: "Agent not found" });
+    expect(response.body.error.message).toBe("Agent 'missing' not found");
   });
 });
 
