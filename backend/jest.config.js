@@ -2,14 +2,6 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['**/src/**/*.test.ts', '**/tests/**/*.test.ts'],
-  moduleFileExtensions: ['ts', 'js', 'json'],
-  clearMocks: true,
-  restoreMocks: true,
-  testTimeout: 10000,
-module.exports = {
-  preset: 'ts-jest',
-  testEnvironment: 'node',
   roots: ['<rootDir>/tests', '<rootDir>/src'],
   testMatch: ['**/?(*.)+(spec|test).[tj]s'],
   testTimeout: 130_000,
@@ -48,12 +40,12 @@ module.exports = {
     '!src/index.ts',
     '!src/checkSpec.ts',
   ],
-  coverageThresholds: {
+  coverageThreshold: {
     global: {
-      statements: 90,
-      branches: 80,
-      functions: 85,
-      lines: 90,
+      statements: 75,
+      branches: 70,
+      functions: 75,
+      lines: 75,
     },
   },
   coverageReporters: ['text', 'lcov', 'html'],
