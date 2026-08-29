@@ -223,7 +223,7 @@ npm run test:e2e
 - [Developer Setup Guide](docs/DEVELOPER_SETUP.md): Fast onboarding from clean clone to running local node, testnet deployments, Freighter wallet setup, and testing.
 - [Governance & Timelock Architecture](docs/architecture/governance-timelock.md): Multi-signature quorum, timelock lifecycle, and emergency circuit breakers.
 - [Technical Architecture Specification](docs/architecture/index.md): System context, component diagrams, and Soroban payment escrow settlement workflows.
-- [REST API Reference](docs/API_REFERENCE.md): Comprehensive endpoint schemas, error codes, and runnable curl examples.
+- [REST API Reference](docs/API_REFERENCE.md): Comprehensive per-endpoint documentation, error codes taxonomy, authentication headers, and runnable curl examples.
 - [Node Operators Guide](docs/NODE_OPERATORS_GUIDE.md): Step-by-step instructions for provisioning, configuring secrets, deploying smart contracts, funding accounts, operating nodes, monitoring metrics, and troubleshooting common errors.
 - [Smart Contract Deployment Guide](smart-contracts/docs/DEPLOYMENT_GUIDE.md): Complete deployment and upgrade workflows on Soroban.
 - [End-to-End Testing Guide](docs/e2e-testing.md): Automated test execution and validation.
@@ -234,7 +234,8 @@ npm run test:e2e
 
 ai-net is an open-source project and **contributions are welcome at every level** — from fixing typos to building new agent types.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get started.
+- Read our **[CONTRIBUTING.md](CONTRIBUTING.md)** for our SDLC, branching rules, Conventional Commits, and review checklists.
+- For AI agent contributors, see **[AGENTS.md](AGENTS.md)** for architectural standards and code invariants.
 
 Looking for a place to start? Check [ISSUES.md](ISSUES.md) or browse [good first issues](../../issues?q=label%3A%22good+first+issue%22).
 
