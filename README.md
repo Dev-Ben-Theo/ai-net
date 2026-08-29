@@ -206,6 +206,14 @@ npm run test:e2e
 
 ---
 
+## Documentation
+
+- [Node Operators Guide](docs/NODE_OPERATORS_GUIDE.md): Step-by-step instructions for provisioning, configuring secrets, deploying smart contracts, funding accounts, operating nodes, monitoring metrics, and troubleshooting common errors.
+- [Smart Contract Deployment Guide](smart-contracts/docs/DEPLOYMENT_GUIDE.md): Complete deployment and upgrade workflows on Soroban.
+- [End-to-End Testing Guide](docs/e2e-testing.md): Automated test execution and validation.
+
+---
+
 ## Contributing
 
 ai-net is an open-source project and **contributions are welcome at every level** — from fixing typos to building new agent types.
