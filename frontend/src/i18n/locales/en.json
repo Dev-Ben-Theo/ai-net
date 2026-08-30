@@ -304,5 +304,10 @@
   "a11y.dismiss": "Dismiss",
   "a11y.viewOnStellarExplorer": "View on Stellar Explorer",
 
-  "a11y.dismissNotification": "Dismiss notification"
+  "a11y.dismissNotification": "Dismiss notification",
+
+  "nav.group.overview": "Overview",
+  "nav.group.work": "Work",
+  "nav.group.account": "Account",
+  "a11y.skipToContent": "Skip to content"
 }

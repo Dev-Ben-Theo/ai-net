@@ -304,5 +304,10 @@
   "a11y.dismiss": "关闭",
   "a11y.viewOnStellarExplorer": "在 Stellar Explorer 中查看",
 
-  "a11y.dismissNotification": "关闭通知"
+  "a11y.dismissNotification": "关闭通知",
+
+  "nav.group.overview": "概览",
+  "nav.group.work": "工作",
+  "nav.group.account": "账户",
+  "a11y.skipToContent": "跳到主要内容"
 }
