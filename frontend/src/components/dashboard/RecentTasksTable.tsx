@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { Skeleton } from '../common/Skeleton';
 import styles from './RecentTasksTable.module.css';
 import { getRecentTasks } from '@services/api';
-import { useToast } from '../../hooks/useToast';
 import { useToast } from '../../context/ToastContext';
 import type { TaskResponse } from '../../types/api';
 import { formatDateTime } from '../../utils/format';
