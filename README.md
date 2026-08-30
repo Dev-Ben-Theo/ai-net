@@ -122,12 +122,14 @@ ai-net/
 ### Install
 
 ```bash
-git clone https://github.com/YOUR_ORG/ai-net.git
+git clone https://github.com/Epta-Node/ai-net.git
 cd ai-net
 npm install
 cp .env.example .env
 # Fill in your Stellar keypair and Venice AI key
 ```
+
+For a full day-one setup guide covering local development, testnet funding, Docker-backed Stellar nodes, and CI expectations, see [docs/DEVELOPER_SETUP.md](docs/DEVELOPER_SETUP.md).
 
 ### Smart Contract Deployment
 
