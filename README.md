@@ -113,21 +113,44 @@ ai-net/
 
 ## Getting Started
 
-### Prerequisites
+### Quick Start (Docker Compose — Recommended)
 
-- Node.js >= 18
+Run the entire stack (Local Stellar Standalone + Backend API + Frontend) with one command:
+
+```bash
+# 1. Clone & copy environment defaults
+git clone https://github.com/Epta-Node/ai-net.git
+cd ai-net
+
+# 2. Start all services via Docker Compose
+docker compose up -d
+
+# 3. Access interfaces:
+# - Frontend: http://localhost:5173
+# - Backend API: http://localhost:3000 (Health: http://localhost:3000/health)
+# - Stellar Standalone RPC: http://localhost:8000/soroban/rpc
+```
+
+---
+
+### Manual / Local Prerequisites
+
+- Node.js >= 20
+- Docker & Docker Compose
 - A Stellar testnet account ([create one](https://laboratory.stellar.org/#account-creator))
 - Venice AI API key ([get one](https://venice.ai))
 
-### Install
+### Manual Install
 
 ```bash
-git clone https://github.com/YOUR_ORG/ai-net.git
+git clone https://github.com/Epta-Node/ai-net.git
 cd ai-net
 npm install
 cp .env.example .env
 # Fill in your Stellar keypair and Venice AI key
 ```
+
+For a full day-one setup guide covering local development, testnet funding, Docker-backed Stellar nodes, and CI expectations, see [docs/DEVELOPER_SETUP.md](docs/DEVELOPER_SETUP.md).
 
 ### Smart Contract Deployment
 
@@ -220,9 +243,7 @@ npm run test:e2e
 
 ## Documentation
 
-- [Developer Setup Guide](docs/DEVELOPER_SETUP.md): Fast onboarding from clean clone to running local node, testnet deployments, Freighter wallet setup, and testing.
-- [Governance & Timelock Architecture](docs/architecture/governance-timelock.md): Multi-signature quorum, timelock lifecycle, and emergency circuit breakers.
-- [Technical Architecture Specification](docs/architecture/index.md): System context, component diagrams, and Soroban payment escrow settlement workflows.
+- [Architecture Specification](docs/architecture/index.md): System context, component architecture, Mermaid sequence diagrams, and security model.
 - [REST API Reference](docs/API_REFERENCE.md): Comprehensive per-endpoint documentation, error codes taxonomy, authentication headers, and runnable curl examples.
 - [Node Operators Guide](docs/NODE_OPERATORS_GUIDE.md): Step-by-step instructions for provisioning, configuring secrets, deploying smart contracts, funding accounts, operating nodes, monitoring metrics, and troubleshooting common errors.
 - [Smart Contract Deployment Guide](smart-contracts/docs/DEPLOYMENT_GUIDE.md): Complete deployment and upgrade workflows on Soroban.
