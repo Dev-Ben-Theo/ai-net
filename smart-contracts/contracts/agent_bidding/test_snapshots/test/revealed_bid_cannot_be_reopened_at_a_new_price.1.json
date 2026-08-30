@@ -18,7 +18,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "reopen"
                 },
                 {
                   "map": [
@@ -91,13 +91,13 @@
               "function_name": "submit_bid",
               "args": [
                 {
-                  "symbol": "twice_award"
+                  "symbol": "reopen"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "bytes": "6ad7960e121f9ab68f172f8dfa261aaffb85036ab4e9a825506fa0bfdd23a549"
+                  "bytes": "da805e0a2a7e76df4881337eb44ce26e0e6272a0dee8450ab12aed9937a1dddc"
                 },
                 {
                   "i128": {
@@ -106,7 +106,7 @@
                   }
                 },
                 {
-                  "u32": 80
+                  "u32": 50
                 }
               ]
             }
@@ -126,7 +126,7 @@
               "function_name": "reveal_bid",
               "args": [
                 {
-                  "symbol": "twice_award"
+                  "symbol": "reopen"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -134,14 +134,14 @@
                 {
                   "i128": {
                     "hi": 0,
-                    "lo": 5000000
+                    "lo": 4000000
                   }
                 },
                 {
-                  "string": "Solo"
+                  "string": "Fixed"
                 },
                 {
-                  "bytes": "1515151515151515151515151515151515151515151515151515151515151515"
+                  "bytes": "5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d"
                 }
               ]
             }
@@ -163,7 +163,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "reopen"
                 }
               ]
             }
@@ -172,28 +172,7 @@
         }
       ]
     ],
-    [
-      [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "award_contract",
-              "args": [
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                },
-                {
-                  "symbol": "twice_award"
-                }
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
+    [],
     []
   ],
   "ledger": {
@@ -216,7 +195,7 @@
                   "symbol": "Auction"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "reopen"
                 }
               ]
             },
@@ -236,7 +215,7 @@
                       "symbol": "Auction"
                     },
                     {
-                      "symbol": "twice_award"
+                      "symbol": "reopen"
                     }
                   ]
                 },
@@ -338,7 +317,7 @@
                         "symbol": "escrow_created"
                       },
                       "val": {
-                        "bool": true
+                        "bool": false
                       }
                     },
                     {
@@ -346,7 +325,7 @@
                         "symbol": "phase"
                       },
                       "val": {
-                        "u32": 2
+                        "u32": 1
                       }
                     },
                     {
@@ -370,7 +349,7 @@
                         "symbol": "task_id"
                       },
                       "val": {
-                        "symbol": "twice_award"
+                        "symbol": "reopen"
                       }
                     }
                   ]
@@ -392,7 +371,7 @@
                   "symbol": "Bid"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "reopen"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -415,7 +394,7 @@
                       "symbol": "Bid"
                     },
                     {
-                      "symbol": "twice_award"
+                      "symbol": "reopen"
                     },
                     {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -449,7 +428,7 @@
                         "symbol": "commitment"
                       },
                       "val": {
-                        "bytes": "6ad7960e121f9ab68f172f8dfa261aaffb85036ab4e9a825506fa0bfdd23a549"
+                        "bytes": "da805e0a2a7e76df4881337eb44ce26e0e6272a0dee8450ab12aed9937a1dddc"
                       }
                     },
                     {
@@ -467,7 +446,7 @@
                       "val": {
                         "i128": {
                           "hi": 0,
-                          "lo": 5000000
+                          "lo": 4000000
                         }
                       }
                     },
@@ -476,7 +455,7 @@
                         "symbol": "refunded"
                       },
                       "val": {
-                        "bool": true
+                        "bool": false
                       }
                     },
                     {
@@ -484,7 +463,7 @@
                         "symbol": "reputation"
                       },
                       "val": {
-                        "u32": 80
+                        "u32": 50
                       }
                     },
                     {
@@ -511,7 +490,7 @@
                         "symbol": "terms"
                       },
                       "val": {
-                        "string": "Solo"
+                        "string": "Fixed"
                       }
                     }
                   ]
@@ -533,7 +512,7 @@
                   "symbol": "Bidders"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "reopen"
                 }
               ]
             },
@@ -553,7 +532,7 @@
                       "symbol": "Bidders"
                     },
                     {
-                      "symbol": "twice_award"
+                      "symbol": "reopen"
                     }
                   ]
                 },
@@ -579,107 +558,10 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "Escrow"
-                },
-                {
-                  "symbol": "twice_award"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "Escrow"
-                    },
-                    {
-                      "symbol": "twice_award"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "agent"
-                      },
-                      "val": {
-                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "amount"
-                      },
-                      "val": {
-                        "i128": {
-                          "hi": 0,
-                          "lo": 5000000
-                        }
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "creator"
-                      },
-                      "val": {
-                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "refunded"
-                      },
-                      "val": {
-                        "bool": false
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "released"
-                      },
-                      "val": {
-                        "bool": false
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "task_id"
-                      },
-                      "val": {
-                        "symbol": "twice_award"
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          535680
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
                   "symbol": "Winner"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "reopen"
                 }
               ]
             },
@@ -699,7 +581,7 @@
                       "symbol": "Winner"
                     },
                     {
-                      "symbol": "twice_award"
+                      "symbol": "reopen"
                     }
                   ]
                 },
@@ -801,39 +683,6 @@
                 "key": {
                   "ledger_key_nonce": {
                     "nonce": 801925984706572462
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": 2032731177588607455
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-                "key": {
-                  "ledger_key_nonce": {
-                    "nonce": 2032731177588607455
                   }
                 },
                 "durability": "temporary",

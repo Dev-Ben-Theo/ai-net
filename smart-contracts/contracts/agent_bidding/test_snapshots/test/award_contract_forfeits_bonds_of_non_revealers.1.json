@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 4,
+    "address": 5,
     "nonce": 0
   },
   "auth": [
@@ -18,7 +18,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "forfeit"
                 },
                 {
                   "map": [
@@ -81,6 +81,7 @@
       ]
     ],
     [],
+    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
@@ -91,13 +92,13 @@
               "function_name": "submit_bid",
               "args": [
                 {
-                  "symbol": "twice_award"
+                  "symbol": "forfeit"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "bytes": "6ad7960e121f9ab68f172f8dfa261aaffb85036ab4e9a825506fa0bfdd23a549"
+                  "bytes": "c950f57d0691eb92e8f8c89e86416878bce3bc0de919da169b48fd6b91af80d9"
                 },
                 {
                   "i128": {
@@ -106,7 +107,41 @@
                   }
                 },
                 {
-                  "u32": 80
+                  "u32": 50
+                }
+              ]
+            }
+          },
+          "sub_invocations": []
+        }
+      ]
+    ],
+    [
+      [
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM",
+        {
+          "function": {
+            "contract_fn": {
+              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "function_name": "submit_bid",
+              "args": [
+                {
+                  "symbol": "forfeit"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                },
+                {
+                  "bytes": "f816db8b70be187820535995026bfd131e9d24a61d06b41584dbc4e2b0333def"
+                },
+                {
+                  "i128": {
+                    "hi": 0,
+                    "lo": 500000
+                  }
+                },
+                {
+                  "u32": 99
                 }
               ]
             }
@@ -126,7 +161,7 @@
               "function_name": "reveal_bid",
               "args": [
                 {
-                  "symbol": "twice_award"
+                  "symbol": "forfeit"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -134,14 +169,14 @@
                 {
                   "i128": {
                     "hi": 0,
-                    "lo": 5000000
+                    "lo": 3000000
                   }
                 },
                 {
-                  "string": "Solo"
+                  "string": "T"
                 },
                 {
-                  "bytes": "1515151515151515151515151515151515151515151515151515151515151515"
+                  "bytes": "6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f"
                 }
               ]
             }
@@ -150,6 +185,7 @@
         }
       ]
     ],
+    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
@@ -163,7 +199,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "forfeit"
                 }
               ]
             }
@@ -185,7 +221,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "forfeit"
                 }
               ]
             }
@@ -194,12 +230,13 @@
         }
       ]
     ],
+    [],
     []
   ],
   "ledger": {
     "protocol_version": 22,
     "sequence_number": 0,
-    "timestamp": 3601,
+    "timestamp": 7201,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
@@ -216,7 +253,7 @@
                   "symbol": "Auction"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "forfeit"
                 }
               ]
             },
@@ -236,7 +273,7 @@
                       "symbol": "Auction"
                     },
                     {
-                      "symbol": "twice_award"
+                      "symbol": "forfeit"
                     }
                   ]
                 },
@@ -248,7 +285,7 @@
                         "symbol": "bid_count"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 2
                       }
                     },
                     {
@@ -370,7 +407,7 @@
                         "symbol": "task_id"
                       },
                       "val": {
-                        "symbol": "twice_award"
+                        "symbol": "forfeit"
                       }
                     }
                   ]
@@ -392,7 +429,7 @@
                   "symbol": "Bid"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "forfeit"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -415,7 +452,7 @@
                       "symbol": "Bid"
                     },
                     {
-                      "symbol": "twice_award"
+                      "symbol": "forfeit"
                     },
                     {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -449,7 +486,7 @@
                         "symbol": "commitment"
                       },
                       "val": {
-                        "bytes": "6ad7960e121f9ab68f172f8dfa261aaffb85036ab4e9a825506fa0bfdd23a549"
+                        "bytes": "c950f57d0691eb92e8f8c89e86416878bce3bc0de919da169b48fd6b91af80d9"
                       }
                     },
                     {
@@ -467,7 +504,7 @@
                       "val": {
                         "i128": {
                           "hi": 0,
-                          "lo": 5000000
+                          "lo": 3000000
                         }
                       }
                     },
@@ -484,7 +521,7 @@
                         "symbol": "reputation"
                       },
                       "val": {
-                        "u32": 80
+                        "u32": 50
                       }
                     },
                     {
@@ -511,7 +548,148 @@
                         "symbol": "terms"
                       },
                       "val": {
-                        "string": "Solo"
+                        "string": "T"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          535680
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "Bid"
+                },
+                {
+                  "symbol": "forfeit"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "Bid"
+                    },
+                    {
+                      "symbol": "forfeit"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "bidder"
+                      },
+                      "val": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "bond"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 500000
+                        }
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "commitment"
+                      },
+                      "val": {
+                        "bytes": "f816db8b70be187820535995026bfd131e9d24a61d06b41584dbc4e2b0333def"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "forfeited"
+                      },
+                      "val": {
+                        "bool": true
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "price_stroops"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 0
+                        }
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "refunded"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "reputation"
+                      },
+                      "val": {
+                        "u32": 99
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "revealed"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "score"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 0
+                        }
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "terms"
+                      },
+                      "val": {
+                        "string": ""
                       }
                     }
                   ]
@@ -533,7 +711,7 @@
                   "symbol": "Bidders"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "forfeit"
                 }
               ]
             },
@@ -553,7 +731,7 @@
                       "symbol": "Bidders"
                     },
                     {
-                      "symbol": "twice_award"
+                      "symbol": "forfeit"
                     }
                   ]
                 },
@@ -562,6 +740,9 @@
                   "vec": [
                     {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                     }
                   ]
                 }
@@ -582,7 +763,7 @@
                   "symbol": "Escrow"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "forfeit"
                 }
               ]
             },
@@ -602,7 +783,7 @@
                       "symbol": "Escrow"
                     },
                     {
-                      "symbol": "twice_award"
+                      "symbol": "forfeit"
                     }
                   ]
                 },
@@ -624,7 +805,7 @@
                       "val": {
                         "i128": {
                           "hi": 0,
-                          "lo": 5000000
+                          "lo": 3000000
                         }
                       }
                     },
@@ -657,7 +838,7 @@
                         "symbol": "task_id"
                       },
                       "val": {
-                        "symbol": "twice_award"
+                        "symbol": "forfeit"
                       }
                     }
                   ]
@@ -679,7 +860,7 @@
                   "symbol": "Winner"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "forfeit"
                 }
               ]
             },
@@ -699,7 +880,7 @@
                       "symbol": "Winner"
                     },
                     {
-                      "symbol": "twice_award"
+                      "symbol": "forfeit"
                     }
                   ]
                 },
@@ -752,7 +933,7 @@
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
             "key": {
               "ledger_key_nonce": {
-                "nonce": 4837995959683129791
+                "nonce": 2032731177588607455
               }
             },
             "durability": "temporary"
@@ -767,7 +948,7 @@
                 "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
                 "key": {
                   "ledger_key_nonce": {
-                    "nonce": 4837995959683129791
+                    "nonce": 2032731177588607455
                   }
                 },
                 "durability": "temporary",
@@ -818,7 +999,7 @@
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
             "key": {
               "ledger_key_nonce": {
-                "nonce": 2032731177588607455
+                "nonce": 4270020994084947596
               }
             },
             "durability": "temporary"
@@ -833,7 +1014,7 @@
                 "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
                 "key": {
                   "ledger_key_nonce": {
-                    "nonce": 2032731177588607455
+                    "nonce": 4270020994084947596
                   }
                 },
                 "durability": "temporary",
@@ -851,7 +1032,7 @@
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
             "key": {
               "ledger_key_nonce": {
-                "nonce": 1033654523790656264
+                "nonce": 4837995959683129791
               }
             },
             "durability": "temporary"
@@ -866,7 +1047,7 @@
                 "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
                 "key": {
                   "ledger_key_nonce": {
-                    "nonce": 1033654523790656264
+                    "nonce": 4837995959683129791
                   }
                 },
                 "durability": "temporary",
@@ -900,6 +1081,39 @@
                 "key": {
                   "ledger_key_nonce": {
                     "nonce": 5541220902715666415
+                  }
+                },
+                "durability": "temporary",
+                "val": "void"
+              }
+            },
+            "ext": "v0"
+          },
+          6311999
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM",
+            "key": {
+              "ledger_key_nonce": {
+                "nonce": 1033654523790656264
+              }
+            },
+            "durability": "temporary"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM",
+                "key": {
+                  "ledger_key_nonce": {
+                    "nonce": 1033654523790656264
                   }
                 },
                 "durability": "temporary",

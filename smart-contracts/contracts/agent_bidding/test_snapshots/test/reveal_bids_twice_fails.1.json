@@ -18,7 +18,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "rb_twice"
                 },
                 {
                   "map": [
@@ -91,13 +91,13 @@
               "function_name": "submit_bid",
               "args": [
                 {
-                  "symbol": "twice_award"
+                  "symbol": "rb_twice"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "bytes": "6ad7960e121f9ab68f172f8dfa261aaffb85036ab4e9a825506fa0bfdd23a549"
+                  "bytes": "fccff2591e7f205eff66641ee2af39f956d8b3e9079b2ba8fc17ffd9851594e2"
                 },
                 {
                   "i128": {
@@ -106,7 +106,7 @@
                   }
                 },
                 {
-                  "u32": 80
+                  "u32": 75
                 }
               ]
             }
@@ -126,7 +126,7 @@
               "function_name": "reveal_bid",
               "args": [
                 {
-                  "symbol": "twice_award"
+                  "symbol": "rb_twice"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -134,14 +134,14 @@
                 {
                   "i128": {
                     "hi": 0,
-                    "lo": 5000000
+                    "lo": 3000000
                   }
                 },
                 {
                   "string": "Solo"
                 },
                 {
-                  "bytes": "1515151515151515151515151515151515151515151515151515151515151515"
+                  "bytes": "1010101010101010101010101010101010101010101010101010101010101010"
                 }
               ]
             }
@@ -163,29 +163,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
-                  "symbol": "twice_award"
-                }
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [
-      [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "award_contract",
-              "args": [
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                },
-                {
-                  "symbol": "twice_award"
+                  "symbol": "rb_twice"
                 }
               ]
             }
@@ -216,7 +194,7 @@
                   "symbol": "Auction"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "rb_twice"
                 }
               ]
             },
@@ -236,7 +214,7 @@
                       "symbol": "Auction"
                     },
                     {
-                      "symbol": "twice_award"
+                      "symbol": "rb_twice"
                     }
                   ]
                 },
@@ -338,7 +316,7 @@
                         "symbol": "escrow_created"
                       },
                       "val": {
-                        "bool": true
+                        "bool": false
                       }
                     },
                     {
@@ -346,7 +324,7 @@
                         "symbol": "phase"
                       },
                       "val": {
-                        "u32": 2
+                        "u32": 1
                       }
                     },
                     {
@@ -370,7 +348,7 @@
                         "symbol": "task_id"
                       },
                       "val": {
-                        "symbol": "twice_award"
+                        "symbol": "rb_twice"
                       }
                     }
                   ]
@@ -392,7 +370,7 @@
                   "symbol": "Bid"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "rb_twice"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -415,7 +393,7 @@
                       "symbol": "Bid"
                     },
                     {
-                      "symbol": "twice_award"
+                      "symbol": "rb_twice"
                     },
                     {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -449,7 +427,7 @@
                         "symbol": "commitment"
                       },
                       "val": {
-                        "bytes": "6ad7960e121f9ab68f172f8dfa261aaffb85036ab4e9a825506fa0bfdd23a549"
+                        "bytes": "fccff2591e7f205eff66641ee2af39f956d8b3e9079b2ba8fc17ffd9851594e2"
                       }
                     },
                     {
@@ -467,7 +445,7 @@
                       "val": {
                         "i128": {
                           "hi": 0,
-                          "lo": 5000000
+                          "lo": 3000000
                         }
                       }
                     },
@@ -476,7 +454,7 @@
                         "symbol": "refunded"
                       },
                       "val": {
-                        "bool": true
+                        "bool": false
                       }
                     },
                     {
@@ -484,7 +462,7 @@
                         "symbol": "reputation"
                       },
                       "val": {
-                        "u32": 80
+                        "u32": 75
                       }
                     },
                     {
@@ -533,7 +511,7 @@
                   "symbol": "Bidders"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "rb_twice"
                 }
               ]
             },
@@ -553,7 +531,7 @@
                       "symbol": "Bidders"
                     },
                     {
-                      "symbol": "twice_award"
+                      "symbol": "rb_twice"
                     }
                   ]
                 },
@@ -579,107 +557,10 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "Escrow"
-                },
-                {
-                  "symbol": "twice_award"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "Escrow"
-                    },
-                    {
-                      "symbol": "twice_award"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "agent"
-                      },
-                      "val": {
-                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "amount"
-                      },
-                      "val": {
-                        "i128": {
-                          "hi": 0,
-                          "lo": 5000000
-                        }
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "creator"
-                      },
-                      "val": {
-                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "refunded"
-                      },
-                      "val": {
-                        "bool": false
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "released"
-                      },
-                      "val": {
-                        "bool": false
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "task_id"
-                      },
-                      "val": {
-                        "symbol": "twice_award"
-                      }
-                    }
-                  ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          535680
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
                   "symbol": "Winner"
                 },
                 {
-                  "symbol": "twice_award"
+                  "symbol": "rb_twice"
                 }
               ]
             },
@@ -699,7 +580,7 @@
                       "symbol": "Winner"
                     },
                     {
-                      "symbol": "twice_award"
+                      "symbol": "rb_twice"
                     }
                   ]
                 },
@@ -801,39 +682,6 @@
                 "key": {
                   "ledger_key_nonce": {
                     "nonce": 801925984706572462
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": 2032731177588607455
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-                "key": {
-                  "ledger_key_nonce": {
-                    "nonce": 2032731177588607455
                   }
                 },
                 "durability": "temporary",

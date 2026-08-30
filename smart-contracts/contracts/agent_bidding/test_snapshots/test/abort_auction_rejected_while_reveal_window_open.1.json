@@ -18,7 +18,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 },
                 {
-                  "symbol": "events"
+                  "symbol": "too_early"
                 },
                 {
                   "map": [
@@ -79,12 +79,14 @@
           "sub_invocations": []
         }
       ]
-    ]
+    ],
+    [],
+    []
   ],
   "ledger": {
     "protocol_version": 22,
     "sequence_number": 0,
-    "timestamp": 0,
+    "timestamp": 3601,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
@@ -101,7 +103,7 @@
                   "symbol": "Auction"
                 },
                 {
-                  "symbol": "events"
+                  "symbol": "too_early"
                 }
               ]
             },
@@ -121,7 +123,7 @@
                       "symbol": "Auction"
                     },
                     {
-                      "symbol": "events"
+                      "symbol": "too_early"
                     }
                   ]
                 },
@@ -255,7 +257,7 @@
                         "symbol": "task_id"
                       },
                       "val": {
-                        "symbol": "events"
+                        "symbol": "too_early"
                       }
                     }
                   ]
@@ -277,7 +279,7 @@
                   "symbol": "Bidders"
                 },
                 {
-                  "symbol": "events"
+                  "symbol": "too_early"
                 }
               ]
             },
@@ -297,7 +299,7 @@
                       "symbol": "Bidders"
                     },
                     {
-                      "symbol": "events"
+                      "symbol": "too_early"
                     }
                   ]
                 },
@@ -400,111 +402,5 @@
       ]
     ]
   },
-  "events": [
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "bidding"
-              },
-              {
-                "symbol": "created"
-              }
-            ],
-            "data": {
-              "map": [
-                {
-                  "key": {
-                    "symbol": "bond"
-                  },
-                  "val": {
-                    "i128": {
-                      "hi": 0,
-                      "lo": 500000
-                    }
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "creator"
-                  },
-                  "val": {
-                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "deadline"
-                  },
-                  "val": {
-                    "u64": 3600
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "duration_secs"
-                  },
-                  "val": {
-                    "u64": 3600
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "max_price"
-                  },
-                  "val": {
-                    "i128": {
-                      "hi": 0,
-                      "lo": 100000000000000000
-                    }
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "reserve_price"
-                  },
-                  "val": {
-                    "i128": {
-                      "hi": 0,
-                      "lo": 1000000
-                    }
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "reveal_deadline"
-                  },
-                  "val": {
-                    "u64": 7200
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "reveal_duration_secs"
-                  },
-                  "val": {
-                    "u64": 3600
-                  }
-                },
-                {
-                  "key": {
-                    "symbol": "task_id"
-                  },
-                  "val": {
-                    "symbol": "events"
-                  }
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    }
-  ]
+  "events": []
 }
