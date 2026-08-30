@@ -113,13 +113,34 @@ ai-net/
 
 ## Getting Started
 
-### Prerequisites
+### Quick Start (Docker Compose — Recommended)
 
-- Node.js >= 18
+Run the entire stack (Local Stellar Standalone + Backend API + Frontend) with one command:
+
+```bash
+# 1. Clone & copy environment defaults
+git clone https://github.com/Epta-Node/ai-net.git
+cd ai-net
+
+# 2. Start all services via Docker Compose
+docker compose up -d
+
+# 3. Access interfaces:
+# - Frontend: http://localhost:5173
+# - Backend API: http://localhost:3000 (Health: http://localhost:3000/health)
+# - Stellar Standalone RPC: http://localhost:8000/soroban/rpc
+```
+
+---
+
+### Manual / Local Prerequisites
+
+- Node.js >= 20
+- Docker & Docker Compose
 - A Stellar testnet account ([create one](https://laboratory.stellar.org/#account-creator))
 - Venice AI API key ([get one](https://venice.ai))
 
-### Install
+### Manual Install
 
 ```bash
 git clone https://github.com/Epta-Node/ai-net.git
