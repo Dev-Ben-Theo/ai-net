@@ -47,6 +47,7 @@ use events::{
     OperationProposed, RegistryInitializedEvent, AnalyticsRecordedEvent,
     LeaderboardUpdatedEvent, SlaSetEvent, SlaViolationDetectedEvent, SlaBonusAwardedEvent,
 };
+pub use types::Attestation;
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Map, String, Symbol,
     TryFromVal, Val, Vec,
