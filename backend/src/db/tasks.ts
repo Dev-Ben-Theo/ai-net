@@ -3,9 +3,10 @@ import path from "path";
 import type { Task, TaskStatus } from "../types/task";
 import type { QualityScoreRecord } from "../services/qualityScorer.types";
 import { createLogger } from "../utils/logger";
-import { encodeCursor, decodeCursor, type CursorPage } from "./cursor";
+import { migrateToLatest } from "./migrator";
 
 const logger = createLogger({ component: "task-db" });
+const MIGRATIONS_DIR = path.join(__dirname, "migrations", "tasks");
 
 let _taskDb: Database.Database | null = null;
 
@@ -22,41 +23,7 @@ export function getTaskDb(dbPath?: string): Database.Database {
     } catch {
       // error events are emitted from node EventEmitter support in runtime
     }
-    _taskDb.exec(`
-      CREATE TABLE IF NOT EXISTS tasks (
-        id              TEXT PRIMARY KEY,
-        prompt          TEXT NOT NULL,
-        walletPublicKey TEXT NOT NULL DEFAULT '',
-        status          TEXT NOT NULL DEFAULT 'queued',
-        dagJson         TEXT NOT NULL DEFAULT '[]',
-        createdAt       TEXT NOT NULL,
-        updatedAt       TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS task_events (
-        id        INTEGER PRIMARY KEY AUTOINCREMENT,
-        taskId    TEXT    NOT NULL,
-        type      TEXT    NOT NULL,
-        nodeId    TEXT,
-        payload   TEXT,
-        timestamp TEXT    NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_task_events_taskId ON task_events (taskId);
-      CREATE INDEX IF NOT EXISTS idx_tasks_wallet_created ON tasks (walletPublicKey, createdAt DESC, id DESC);
-      CREATE TABLE IF NOT EXISTS quality_scores (
-        id           INTEGER PRIMARY KEY AUTOINCREMENT,
-        taskId       TEXT    NOT NULL,
-        nodeId       TEXT    NOT NULL,
-        agentId      TEXT,
-        agentType    TEXT    NOT NULL,
-        score        REAL    NOT NULL,
-        completeness REAL    NOT NULL,
-        relevance    REAL    NOT NULL,
-        format       REAL    NOT NULL,
-        needsReview  INTEGER NOT NULL DEFAULT 0,
-        timestamp    TEXT    NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_quality_scores_agentId ON quality_scores (agentId);
-    `);
+    migrateToLatest(_taskDb, MIGRATIONS_DIR);
   }
   return _taskDb;
 }

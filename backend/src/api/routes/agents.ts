@@ -1,137 +1,10 @@
-/**
- * Agent registry API routes.
- *
- * GET  /api/agents         — list agents (cached, CACHE_TTL_AGENTS)
- * GET  /api/agents/:id     — get single agent (cached, CACHE_TTL_AGENTS)
- * POST /api/agents/register — register agent → INVALIDATES agents + stats cache
- * DELETE /api/agents/:id   — deregister agent → INVALIDATES agents + stats cache
- *
- * Full implementation tracked in Issue #24.  The routes are scaffolded here so
- * cache middleware and invalidation are fully exercised.
- */
-
-import { Router, Request, Response } from 'express';
-import { ttlForRoute } from '../../config/index';
-import { cacheMiddleware } from '../middleware/cache';
-import { invalidateOnAgentRegistration } from '../../cache/invalidation';
-
-const router = Router();
-
-// In-memory stub store until Issue #24 wires up the DB
-const agentStore = new Map<string, AgentRecord>();
-
-export interface AgentRecord {
-  id: string;
-  name: string;
-  capabilities: string[];
-  pricingXLM: number;
-  endpoint: string;
-  stellarPublicKey: string;
-  reputationScore: number;
-  lastSeenAt: string;
-}
-
-// ── GET /api/agents ──────────────────────────────────────────────────────────
-
-router.get(
-  '/',
-  cacheMiddleware({ ttl: ttlForRoute('agents') }),
-  (req: Request, res: Response) => {
-    let agents = Array.from(agentStore.values());
-
-    // Optional filters
-    if (req.query['capability']) {
-      agents = agents.filter((a) =>
-        a.capabilities.includes(req.query['capability'] as string),
-      );
-    }
-    if (req.query['minReputation']) {
-      const min = parseFloat(req.query['minReputation'] as string);
-      agents = agents.filter((a) => a.reputationScore >= min);
-    }
-    if (req.query['maxPriceXLM']) {
-      const max = parseFloat(req.query['maxPriceXLM'] as string);
-      agents = agents.filter((a) => a.pricingXLM <= max);
-    }
-
-    res.json(agents);
-  },
-);
-
-// ── GET /api/agents/:id ──────────────────────────────────────────────────────
-
-router.get(
-  '/:id',
-  cacheMiddleware({ ttl: ttlForRoute('agents') }),
-  (req: Request, res: Response) => {
-    const agent = agentStore.get(req.params['id']!);
-    if (!agent) {
-      res.status(404).json({ error: { message: 'Agent not found', code: 'AGENT_NOT_FOUND' } });
-      return;
-    }
-    res.json(agent);
-  },
-);
-
-// ── POST /api/agents/register ─────────────────────────────────────────────────
-// Must be before /:id to avoid matching 'register' as an id
-
-router.post('/register', async (req: Request, res: Response) => {
-  const { agentId, capabilities, pricingXLM, endpoint, stellarPublicKey } = req.body as {
-    agentId: string;
-    capabilities: string[];
-    pricingXLM: number;
-    endpoint: string;
-    stellarPublicKey: string;
-  };
-
-  if (!agentId || !capabilities?.length || !stellarPublicKey) {
-    res.status(400).json({
-      error: { message: 'agentId, capabilities, and stellarPublicKey are required', code: 'INVALID_BODY' },
-    });
-    return;
-  }
-
-  const record: AgentRecord = {
-    id: agentId,
-    name: agentId,
-    capabilities,
-    pricingXLM: pricingXLM ?? 1,
-    endpoint: endpoint ?? '',
-    stellarPublicKey,
-    reputationScore: 1,
-    lastSeenAt: new Date().toISOString(),
-  };
-  agentStore.set(agentId, record);
-
-  // Invalidate cached agent list and stats
-  await invalidateOnAgentRegistration();
-
-  res.status(201).json({ registered: true, agent: record });
-});
-
-// ── DELETE /api/agents/:id ────────────────────────────────────────────────────
-
-router.delete('/:id', async (req: Request, res: Response) => {
-  const id = req.params['id']!;
-  if (!agentStore.has(id)) {
-    res.status(404).json({ error: { message: 'Agent not found', code: 'AGENT_NOT_FOUND' } });
-    return;
-  }
-
-  agentStore.delete(id);
-  await invalidateOnAgentRegistration();
-
-  res.status(204).send();
-});
-
-export default router;
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { Horizon, Keypair } from "@stellar/stellar-sdk";
+import { RegisterAgentSchema } from "../schemas/agent.schema";
 import { getAgentDb, createAgentDb, AgentDb } from "../../db/agents";
 import { heartbeatRateLimitMiddleware } from "../middleware/rateLimit";
-import { NotFoundError, ValidationError, AuthenticationError } from "../../errors";
+import { NotFoundError, ValidationError, UnauthorizedError, AppError } from "../../errors";
 
 const AgentCursorListSchema = z.object({
   cursor: z.string().optional(),
@@ -253,11 +126,12 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
     const capability = req.query.capability as string | undefined;
     const minReputation = req.query.minReputation ? parseFloat(req.query.minReputation as string) : undefined;
     const maxPriceXLM = req.query.maxPriceXLM ? parseFloat(req.query.maxPriceXLM as string) : undefined;
+
     try {
       const agents = db.list({ capability, minReputation, maxPriceXLM });
       res.json(agents);
     } catch (err) {
-      next(err);
+      next(new AppError("Internal Server Error", 500, "INTERNAL_ERROR"));
     }
   });
 
@@ -633,18 +507,18 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
       const challenge = req.headers["x-challenge"] as string;
       
       if (!signature || !challenge) {
-        throw new AuthenticationError("Missing challenge or signature", undefined, correlationId);
+        throw new UnauthorizedError("Missing challenge or signature", undefined, correlationId);
       }
       
       try {
         const keypair = Keypair.fromPublicKey(agent.stellarPublicKey);
         const isValid = keypair.verify(Buffer.from(challenge), Buffer.from(signature, "base64"));
         if (!isValid) {
-          throw new AuthenticationError("Invalid signature", undefined, correlationId);
+          throw new UnauthorizedError("Invalid signature", undefined, correlationId);
         }
       } catch (innerErr) {
-        if (innerErr instanceof AuthenticationError) throw innerErr;
-        throw new AuthenticationError("Invalid signature format", undefined, correlationId);
+        if (innerErr instanceof UnauthorizedError) throw innerErr;
+        throw new UnauthorizedError("Invalid signature format", undefined, correlationId);
       }
       
       db.delete(req.params.id);
@@ -658,3 +532,4 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
 }
 
 export const agentsRouter = createAgentsRouter();
+export default agentsRouter;

@@ -1,6 +1,8 @@
 import Database from "better-sqlite3";
 import path from "path";
-import { encodeCursor, decodeCursor, type CursorPage } from "./cursor";
+import { migrateToLatest } from "./migrator";
+
+const MIGRATIONS_DIR = path.join(__dirname, "migrations", "agents");
 
 export interface AgentRecord {
   id: string;
@@ -30,23 +32,7 @@ export function getAgentDb(dbPath?: string): Database.Database {
   if (!_agentDb) {
     const filePath = dbPath ?? path.join(process.cwd(), "agents.db");
     _agentDb = new Database(filePath);
-    _agentDb.exec(`
-      CREATE TABLE IF NOT EXISTS agents (
-        id               TEXT PRIMARY KEY,
-        capabilities     TEXT NOT NULL,
-        pricingXLM       REAL NOT NULL,
-        endpoint         TEXT NOT NULL,
-        stellarPublicKey TEXT NOT NULL,
-        reputationScore  REAL NOT NULL DEFAULT 0,
-        lastSeenAt       TEXT NOT NULL,
-        status           TEXT NOT NULL DEFAULT 'online'
-      )
-    `);
-    try {
-      _agentDb.exec("ALTER TABLE agents ADD COLUMN status TEXT NOT NULL DEFAULT 'offline'");
-    } catch (e) {
-      // Ignored if column already exists
-    }
+    migrateToLatest(_agentDb, MIGRATIONS_DIR);
   }
   return _agentDb;
 }
