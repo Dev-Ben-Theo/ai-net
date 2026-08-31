@@ -1,3 +1,12 @@
+/**
+ * Express application factory.
+ *
+ * Wires up middleware, routes, the WebSocket task stream, background
+ * services (job queue/worker, heartbeat cleanup, metrics), and the global
+ * error handler. Called by tests (`opts.disableCompression`, custom
+ * dispatch/queue, etc.) and by the server entry-point (`src/index.ts`).
+ */
+
 import express, { Request, Response, NextFunction } from "express";
 import { createServer, Server as HttpServer } from "http";
 import { randomUUID } from "crypto";
@@ -58,6 +67,7 @@ import {
   type JobQueue,
 } from "../queue";
 import { createAdminQueueRouter } from "./routes/admin";
+import { metricsService, metricsMiddleware } from "../services/metrics";
 
 export interface AppOptions {
   /** Called to execute a single DAG node; defaults to HTTP dispatch via agent registry */
