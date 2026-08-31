@@ -1,3 +1,12 @@
+/**
+ * Express application factory.
+ *
+ * Wires up middleware, routes, the WebSocket task stream, background
+ * services (job queue/worker, heartbeat cleanup, metrics), and the global
+ * error handler. Called by tests (`opts.disableCompression`, custom
+ * dispatch/queue, etc.) and by the server entry-point (`src/index.ts`).
+ */
+
 import express, { Request, Response, NextFunction } from "express";
 import { createServer, Server as HttpServer } from "http";
 import { randomUUID } from "crypto";
@@ -42,6 +51,7 @@ import { createAuthRouter } from "./routes/auth";
 import { type AuthService } from "../services/auth";
 import { createLogger } from "../utils/logger";
 import { createTaskDb, getTaskDb } from "../db/tasks";
+import { ValidationError, UnauthorizedError, NotFoundError, AppError } from "../errors";
 import { createHeartbeatService, type HeartbeatServiceOptions } from "../services/heartbeat";
 import { createTaskJobHandler } from "../coordinator/coordinator";
 import {
@@ -59,6 +69,7 @@ import {
   type JobQueue,
 } from "../queue";
 import { createAdminQueueRouter } from "./routes/admin";
+import { metricsService, metricsMiddleware } from "../services/metrics";
 
 export interface AppOptions {
   /** Called to execute a single DAG node; defaults to HTTP dispatch via agent registry */
@@ -99,12 +110,6 @@ export interface AppOptions {
   enableQueueWorker?: boolean;
 }
 
-/**
- * Attempt to load smart-contracts releasePayment at runtime via dynamic require.
- * Returns undefined when the module is unavailable (e.g. backend CI without
- * smart-contracts compiled). Using require() instead of a static import keeps
- * TypeScript's rootDir constraint intact.
- */
 function tryLoadStellarRelease(): StellarReleasePaymentFn | undefined {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -221,6 +226,12 @@ export function createApp(opts: AppOptions = {}): {
   app.use("/api/admin/queue", createAdminQueueRouter(jobQueue));
   app.use("/api/admin", createAdminQueueRouter(jobQueue));
 
+  // ── Feature-flag admin routes (#425) ───────────────────────────────────────
+  app.use("/api/admin/flags", createFlagsRouter());
+
+  // ── Versioning lifecycle endpoint (#426) ───────────────────────────────────
+  app.use("/api/versions", createVersionsRouter());
+
   // ── Payment reconciliation routes ──────────────────────────────────────────
   app.use("/api/reconciliation", createReconciliationRouter(opts.reconciliation));
 
@@ -235,7 +246,6 @@ export function createApp(opts: AppOptions = {}): {
   // a custom store; in production it will always be undefined here.
   const eventStore = opts.eventStore ?? eventBus.store;
 
-  // ── WebSocket: /tasks/:id/stream ───────────────────────────────────────────
   const detachStream = attachTaskStream({
     httpServer,
     eventStore,
@@ -272,7 +282,6 @@ export function createApp(opts: AppOptions = {}): {
   return { httpServer, close };
 }
 
-
 /**
  * Build a DispatchFn that looks up the cheapest agent for a node's type in the
  * provided registry and forwards the call to that agent via HTTP.
@@ -291,7 +300,7 @@ function makeHttpDispatch(registry?: AgentRegistry): DispatchFn {
 
     const agents = await registry.getAgents(node.type);
     if (!agents || agents.length === 0) {
-      throw new Error(`No agent registered for type: ${node.type}`);
+      throw new AppError(`No agent registered for type: ${node.type}`, 500, "AGENT_NOT_FOUND");
     }
 
     // Pick cheapest available agent.

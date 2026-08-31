@@ -1,18 +1,18 @@
 {
   "name": "ai-net-backend",
   "private": true,
-  "description": "ai-net backend — Node.js/TypeScript server bridging frontend, agent runtime, Stellar payments, and Venice AI",
+  "version": "0.1.0",
+  "description": "ai-net backend — Node.js/TypeScript server bridging frontend, agent runtime, Stellar payments, and Venice AI.",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json && node scripts/copy-migrations.js",
     "dev": "ts-node src/index.ts",
-    "test": "jest --testPathPattern=tests --runInBand --forceExit",
-    "test:watch": "jest --watch",
+    "test": "jest --runInBand --forceExit",
     "test:coverage": "jest --coverage --runInBand --forceExit",
     "test:e2e": "jest --config ../tests/e2e/jest.config.js --runInBand --forceExit",
-    "test:watch": "jest --watch",
-    "lint": "eslint src --ext .ts"
+    "db:migrate": "ts-node src/db/cli.ts migrate",
+    "db:rollback": "ts-node src/db/cli.ts rollback",
+    "db:seed": "ts-node src/db/cli.ts seed"
   },
   "license": "MIT",
   "dependencies": {

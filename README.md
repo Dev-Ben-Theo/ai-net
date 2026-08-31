@@ -203,16 +203,19 @@ For detailed upgrade procedures and troubleshooting, see [UPGRADE_GUIDE.md](smar
 For storage migration guidance, see [STORAGE_MIGRATION.md](smart-contracts/docs/STORAGE_MIGRATION.md).
 
 ### Database migration
-This branch does not include an automated migration runner. To apply the backend index migration, run the SQL script directly against your PostgreSQL database:
+
+The backend's three SQLite databases (`payments.db`, `agents.db`,
+`tasks.db`) are each schema-versioned with their own up/down migrations
+under `backend/src/db/migrations/`. Migrations run automatically whenever
+the server starts (`getDb()`/`getAgentDb()`/`getTaskDb()` each bring their
+database to the latest version on first use), or on demand from
+`backend/`:
 
 ```bash
-psql "$DATABASE_URL" -f backend/src/db/migrations/001_add_stats_indexes.sql
-```
-
-If you need an explicit connection, use:
-
-```bash
-psql -h <host> -U <user> -d <database> -f backend/src/db/migrations/001_add_stats_indexes.sql
+cd backend
+npm run db:migrate          # apply every pending migration, for all three databases
+npm run db:rollback         # roll back the most recently applied migration (add --steps N for more)
+npm run db:seed             # migrate, then insert local-dev sample agents/tasks
 ```
 
 ### Run (testnet)
@@ -246,6 +249,7 @@ npm run test:e2e
 
 ## Documentation
 
+- [Developer Setup Guide](docs/DEVELOPER_SETUP.md): Fast onboarding from clean clone to running local node, testnet deployments, Freighter wallet setup, and testing.
 - [Architecture Specification](docs/architecture/index.md): System context, component architecture, Mermaid sequence diagrams, and security model.
 - [REST API Reference](docs/API_REFERENCE.md): Comprehensive per-endpoint documentation, error codes taxonomy, authentication headers, and runnable curl examples.
 - [Node Operators Guide](docs/NODE_OPERATORS_GUIDE.md): Step-by-step instructions for provisioning, configuring secrets, deploying smart contracts, funding accounts, operating nodes, monitoring metrics, and troubleshooting common errors.

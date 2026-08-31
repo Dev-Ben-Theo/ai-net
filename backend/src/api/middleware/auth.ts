@@ -1,15 +1,5 @@
-import type { Request, Response, NextFunction } from "express";
-import { getAuthService } from "../../services/auth";
-import type { AccessTokenPayload } from "../../services/auth/tokenService";
-
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace Express {
-    interface Request {
-      user?: AccessTokenPayload;
-    }
-  }
-}
+import type { Request, Response, NextFunction } from 'express';
+import { UnauthorizedError } from '../../errors';
 
 function loadKeys(): Set<string> | null {
   const raw = process.env.API_KEYS;
@@ -45,22 +35,14 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
 
   if (!keys) {
-    // API_KEYS unset & no token — no-op, backward compatible
-    return next();
+    next();
+    return;
   }
 
-  res.status(401).json({ error: "Unauthorized" });
-}
-
-/**
- * Strict session auth middleware requiring a valid, active, non-revoked session Bearer token.
- */
-export function sessionAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
-  const auth = req.headers["authorization"] ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-
-  if (!token) {
-    res.status(401).json({ error: "Unauthorized", message: "Authentication token required" });
+  const auth = req.headers['authorization'] ?? '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  if (!token || !keys.has(token)) {
+    next(new UnauthorizedError());
     return;
   }
 
