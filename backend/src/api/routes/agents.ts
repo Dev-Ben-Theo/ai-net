@@ -4,7 +4,7 @@ import { Horizon, Keypair } from "@stellar/stellar-sdk";
 import { RegisterAgentSchema } from "../schemas/agent.schema";
 import { getAgentDb, createAgentDb, AgentDb } from "../../db/agents";
 import { heartbeatRateLimitMiddleware } from "../middleware/rateLimit";
-import { NotFoundError, ValidationError, AuthenticationError } from "../../errors";
+import { NotFoundError, ValidationError, UnauthorizedError, AppError } from "../../errors";
 
 export interface AgentsRouterOptions {
   healthTimeoutMs?: number;
@@ -83,12 +83,12 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
     const capability = req.query.capability as string | undefined;
     const minReputation = req.query.minReputation ? parseFloat(req.query.minReputation as string) : undefined;
     const maxPriceXLM = req.query.maxPriceXLM ? parseFloat(req.query.maxPriceXLM as string) : undefined;
-    
+
     try {
       const agents = db.list({ capability, minReputation, maxPriceXLM });
       res.json(agents);
     } catch (err) {
-      next(err);
+      next(new AppError("Internal Server Error", 500, "INTERNAL_ERROR"));
     }
   });
 
@@ -464,18 +464,18 @@ export function createAgentsRouter(options: AgentsRouterOptions = {}): Router {
       const challenge = req.headers["x-challenge"] as string;
       
       if (!signature || !challenge) {
-        throw new AuthenticationError("Missing challenge or signature", undefined, correlationId);
+        throw new UnauthorizedError("Missing challenge or signature", undefined, correlationId);
       }
       
       try {
         const keypair = Keypair.fromPublicKey(agent.stellarPublicKey);
         const isValid = keypair.verify(Buffer.from(challenge), Buffer.from(signature, "base64"));
         if (!isValid) {
-          throw new AuthenticationError("Invalid signature", undefined, correlationId);
+          throw new UnauthorizedError("Invalid signature", undefined, correlationId);
         }
       } catch (innerErr) {
-        if (innerErr instanceof AuthenticationError) throw innerErr;
-        throw new AuthenticationError("Invalid signature format", undefined, correlationId);
+        if (innerErr instanceof UnauthorizedError) throw innerErr;
+        throw new UnauthorizedError("Invalid signature format", undefined, correlationId);
       }
       
       db.delete(req.params.id);
