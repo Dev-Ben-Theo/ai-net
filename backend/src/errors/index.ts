@@ -1,12 +1,8 @@
 export { AppError } from "./AppError";
 export type { AppErrorDetails, SerializedError } from "./AppError";
-export { ErrorCode } from "./ErrorCode";
-export type { ErrorCode as ErrorCodeType } from "./ErrorCode";
-export { HTTP_STATUS_FOR_CODE, DEFAULT_MESSAGE_FOR_CODE } from "./ErrorCode";
-export { NotFoundError } from "./NotFoundError";
 export { ValidationError } from "./ValidationError";
+export { NotFoundError } from "./NotFoundError";
+export { UnauthorizedError } from "./UnauthorizedError";
 export { AuthenticationError } from "./AuthenticationError";
 export { RateLimitError } from "./RateLimitError";
 export { PaymentError } from "./PaymentError";
-export { ConflictError } from "./ConflictError";
-export { ProviderError } from "./ProviderError";
