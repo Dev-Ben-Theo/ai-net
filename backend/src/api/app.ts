@@ -219,6 +219,12 @@ export function createApp(opts: AppOptions = {}): {
   app.use("/api/admin/queue", createAdminQueueRouter(jobQueue));
   app.use("/api/admin", createAdminQueueRouter(jobQueue));
 
+  // ── Feature-flag admin routes (#425) ───────────────────────────────────────
+  app.use("/api/admin/flags", createFlagsRouter());
+
+  // ── Versioning lifecycle endpoint (#426) ───────────────────────────────────
+  app.use("/api/versions", createVersionsRouter());
+
   // ── Payment reconciliation routes ──────────────────────────────────────────
   app.use("/api/reconciliation", createReconciliationRouter(opts.reconciliation));
 
