@@ -1,41 +1,99 @@
 import express, { Request, Response, NextFunction } from "express";
 import { createServer, Server as HttpServer } from "http";
 import { randomUUID } from "crypto";
+import swaggerUi from "swagger-ui-express";
 
-import { decompose } from "../coordinator/decompose";
 import {
-  executeDAG,
   type DispatchFn,
   type PaymentReleaseFn,
 } from "../coordinator/coordinator";
-import { createTask, getTask } from "../coordinator/taskStore";
+import { httpDispatch } from "../coordinator/dispatch";
+import type { AgentRegistry } from "../types/agent";
+import { getTask } from "../coordinator/taskStore";
 import { eventBus } from "../coordinator/eventBus";
-import { createEventStore, type EventStore } from "../coordinator/eventStore";
-import { attachTaskStream, type TaskStreamOptions } from "./routes/stream";
+import type { EventStore } from "../events/eventStore";
+import {
+  attachTaskStream,
+  getStreamConnectionCount,
+  type TaskStreamOptions,
+} from "./routes/stream";
+import { metricsMiddleware, metricsService } from "../services/metrics";
+import type { DAGNode } from "../types/task";
 import {
   createPaymentReleaseFn,
   type StellarReleasePaymentFn,
 } from "../payment";
 import { agentsRouter } from "./routes/agents";
 import { healthRouter } from "./routes/health";
-import { rateLimitMiddleware } from "./middleware/rateLimit";
+import { createStatsRouter } from "./routes/stats";
+import { createTasksRouter } from "./routes/tasks";
+import { createReconciliationRouter, type ReconciliationRouterOptions } from "./routes/reconciliation";
+import { rateLimitMiddleware, registerRateLimitMiddleware } from "./middleware/rateLimit";
 import { authMiddleware } from "./middleware/auth";
+import { createCorsMiddleware } from "./middleware/cors";
+import { compressionMiddleware } from "./middleware/compression";
 import { requestId } from "./middleware/requestId";
 import { requestLogger } from "./middleware/requestLogger";
 import { errorHandler } from "./middleware/errorHandler";
+import { versioningMiddleware } from "./middleware/versioning";
+import { createV1TasksRouter } from "./routes/v1/tasks";
+import { createV2TasksRouter } from "./routes/v2/tasks";
 import { createLogger } from "../utils/logger";
 import { createTaskDb, getTaskDb } from "../db/tasks";
 import { ValidationError, UnauthorizedError, NotFoundError, AppError } from "../errors";
+import { createHeartbeatService, type HeartbeatServiceOptions } from "../services/heartbeat";
+import { createTaskJobHandler } from "../coordinator/coordinator";
+import {
+  openapiSpec,
+  swaggerUiOptions,
+  getOpenapiJson,
+  getOpenapiYaml,
+} from "./docs";
+import {
+  getGlobalJobQueue,
+  createJobStore,
+  getJobDb,
+  closeJobDb,
+  JobWorker,
+  type JobQueue,
+} from "../queue";
+import { createAdminQueueRouter } from "./routes/admin";
 
 export interface AppOptions {
-  /** Called to execute a single DAG node; defaults to HTTP dispatch */
+  /** Called to execute a single DAG node; defaults to HTTP dispatch via agent registry */
   dispatch?: DispatchFn;
   /** Called after each node completes; defaults to no-op (returns 'mock-hash') */
   releasePayment?: PaymentReleaseFn;
-  /** Event log for stream replay; defaults to an in-memory SQLite store */
+  /**
+   * Override the EventStore used for stream replay.  When omitted, the store
+   * owned by `eventBus` is used — which is the canonical single store that the
+   * EventBus persists to.  Only provide this in tests that need an isolated
+   * store; production code should leave it unset.
+   *
+   * @deprecated Pass a custom EventBus instance (with its own store) instead.
+   */
   eventStore?: EventStore;
   /** Heartbeat / auth timing for the WebSocket stream */
   stream?: TaskStreamOptions;
+  /**
+   * Agent registry used to resolve endpoint URLs for HTTP dispatch.
+   * Required when `dispatch` is not provided; ignored when `dispatch` is set.
+   */
+  agentRegistry?: AgentRegistry;
+  /** Enable background heartbeat cleanup service (defaults to true in non-test envs) */
+  enableHeartbeatCleanup?: boolean;
+  /** Custom options for heartbeat cleanup service */
+  heartbeatOptions?: HeartbeatServiceOptions;
+  /** Options for the payment reconciliation router */
+  reconciliation?: ReconciliationRouterOptions;
+  /** Disable response compression (useful in tests). Default: false. */
+  disableCompression?: boolean;
+  /** Custom job queue instance */
+  queue?: JobQueue;
+  /** Custom job worker instance */
+  jobWorker?: JobWorker;
+  /** Enable background queue worker (default: true) */
+  enableQueueWorker?: boolean;
 }
 
 function tryLoadStellarRelease(): StellarReleasePaymentFn | undefined {
@@ -50,136 +108,120 @@ function tryLoadStellarRelease(): StellarReleasePaymentFn | undefined {
 
 export function createApp(opts: AppOptions = {}): {
   httpServer: HttpServer;
-  close: () => void;
+  close: (callback?: () => void) => void;
 } {
   const app = express();
   app.use(express.json());
+  // ── Global middleware ────────────────────────────────────────────────────────
+  app.use((_req, res, next) => {
+    if (process.env.NODE_ENV === "production") {
+      res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+    }
+    next();
+  });
+  app.use(createCorsMiddleware());
   app.use(requestId);
   app.use(requestLogger);
+  // Samples every response into the health dashboard's rolling window. Mounted
+  // before the routers so latency covers the full handler chain.
+  app.use(metricsMiddleware);
+  app.use(versioningMiddleware);
 
-  const dispatch: DispatchFn = opts.dispatch ?? defaultDispatch;
+  // ── Response compression ────────────────────────────────────────────────────
+  // Applied early so that all downstream route handlers benefit automatically.
+  // Disabled in tests (disableCompression: true) to keep assertions simple.
+  if (!opts.disableCompression && process.env.NODE_ENV !== "test") {
+    app.use(...compressionMiddleware());
+  }
+
+  const dispatch: DispatchFn = opts.dispatch ?? makeHttpDispatch(opts.agentRegistry);
   const releasePayment: PaymentReleaseFn =
     opts.releasePayment ?? createPaymentReleaseFn(tryLoadStellarRelease());
 
+  // ── Background Job Queue & Worker ──────────────────────────────────────────
+  const jobQueue = opts.queue ?? getGlobalJobQueue();
+  const jobWorker =
+    opts.jobWorker ??
+    new JobWorker({
+      jobStore: jobQueue.getStore(),
+      handler: createTaskJobHandler(dispatch, releasePayment),
+    });
+  jobQueue.setWorker(jobWorker);
+
+  if (opts.enableQueueWorker !== false) {
+    jobWorker.start();
+  }
+
+  // ── Heartbeat Background Cleanup Service ────────────────────────────────────
+  const heartbeatService = createHeartbeatService(opts.heartbeatOptions);
+  if (opts.enableHeartbeatCleanup || (opts.enableHeartbeatCleanup !== false && process.env.NODE_ENV !== "test")) {
+    heartbeatService.start();
+  }
+
+  // ── Health routes ───────────────────────────────────────────────────────────
   app.use("/health", healthRouter);
+
+  // ── Stats routes ───────────────────────────────────────────────────────────
+  app.use("/api/stats", createStatsRouter(getTaskDb()));
+
+  // ── Agent routes ───────────────────────────────────────────────────────────
+  // Apply a stricter rate limit specifically to the register endpoint to
+  // prevent registration floods (the full agentsRouter handles GET/DELETE etc.).
+  app.post("/api/agents/register", registerRateLimitMiddleware);
   app.use("/api/agents", agentsRouter);
 
-  app.post(
-    "/api/tasks",
-    authMiddleware,
-    rateLimitMiddleware,
-    (req: Request, res: Response, next: NextFunction) => {
-      try {
-        const { prompt, walletPublicKey, maxBudgetXLM } = req.body as {
-          prompt?: string;
-          walletPublicKey?: string;
-          maxBudgetXLM?: number;
-        };
+  // ── API docs ─────────────────────────────────────────────────────────────────
+  app.get("/openapi.json", (_req: Request, res: Response) => {
+    res.json(getOpenapiJson());
+  });
+  app.get("/openapi.yaml", (_req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/yaml; charset=utf-8");
+    res.send(getOpenapiYaml());
+  });
+  app.get("/docs/swagger.json", (_req: Request, res: Response) => {
+    res.json(getOpenapiJson());
+  });
+  app.get("/docs/swagger.yaml", (_req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/yaml; charset=utf-8");
+    res.send(getOpenapiYaml());
+  });
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec, swaggerUiOptions));
 
-        if (!prompt || typeof prompt !== "string" || prompt.trim() === "") {
-          throw new ValidationError("prompt is required");
-        }
-
-        if (maxBudgetXLM !== undefined && maxBudgetXLM < 0.1) {
-          throw new ValidationError("maxBudgetXLM must be >= 0.1");
-        }
-
-        const taskId = `task_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
-        const dag = decompose(taskId, prompt);
-        const now = new Date().toISOString();
-        const correlationId = res.locals.requestId;
-
-        createTask({
-          taskId,
-          prompt,
-          walletPublicKey:
-            walletPublicKey ??
-            (req.headers["walletpublickey"] as string | undefined) ??
-            "anonymous",
-          status: "queued",
-          dag,
-          createdAt: now,
-          updatedAt: now,
-          requestId: correlationId,
-        });
-
-        const log = createLogger({ requestId: correlationId, taskId });
-
-        setImmediate(() => {
-          executeDAG(getTask(taskId)!, dispatch, releasePayment).catch((err) => {
-            log.error({ err }, "DAG execution error");
-          });
-        });
-
-        log.info({ dagNodeCount: dag.length }, "task created");
-
-        return res
-          .status(201)
-          .json({ taskId, dagPreview: dag, status: "queued" });
-      } catch (err) {
-        next(err);
-      }
-    },
-  );
-
-  app.get("/api/tasks", authMiddleware, (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const walletPublicKey = req.headers["walletpublickey"] as string | undefined;
-      if (!walletPublicKey) {
-        throw new UnauthorizedError("walletpublickey header required");
-      }
-      const page = Math.max(1, parseInt((req.query.page as string) ?? "1", 10));
-      const pageSize = Math.min(
-        100,
-        Math.max(1, parseInt((req.query.pageSize as string) ?? "20", 10)),
-      );
-      const taskDb = createTaskDb(getTaskDb());
-      const status = req.query.status as string | undefined;
-      const q = req.query.q as string | undefined;
-      const sort = req.query.sort as
-        "createdAt:asc" | "createdAt:desc" | undefined;
-      const { tasks, total } = taskDb.list(walletPublicKey, page, pageSize, {
-        status,
-        q,
-        sort,
-      });
-      return res.json({ tasks, total, page, pageSize });
-    } catch (err) {
-      next(err);
+  // ── Task routes ────────────────────────────────────────────────────────────
+  // Create version-specific routers
+  const v1TasksRouter = createV1TasksRouter(dispatch, releasePayment, jobQueue);
+  const v2TasksRouter = createV2TasksRouter(dispatch, releasePayment, jobQueue);
+  
+  // Version-specific task routing based on negotiated API version
+  app.use("/api/tasks", (req, res, next) => {
+    const apiVersion = res.locals.apiVersion || "1.0";
+    
+    // Route to version-specific handler based on negotiated version
+    if (apiVersion.startsWith("1.")) {
+      return v1TasksRouter(req, res, next);
+    } else {
+      // Default to v2 for version 2.0 and above
+      return v2TasksRouter(req, res, next);
     }
   });
 
-  app.get("/api/tasks/:id", (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const task = getTask(req.params.id!);
-      if (!task) throw new NotFoundError("Task");
-      return res.json({ ...task, id: task.taskId, dag: task.dag });
-    } catch (err) {
-      next(err);
-    }
-  });
+  // ── Admin Queue routes ─────────────────────────────────────────────────────
+  app.use("/api/admin/queue", createAdminQueueRouter(jobQueue));
+  app.use("/api/admin", createAdminQueueRouter(jobQueue));
 
-  app.delete("/api/tasks/:id", (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const task = getTask(req.params.id!);
-      if (!task) throw new NotFoundError("Task");
-      if (task.status === "running") {
-        throw new AppError("Cannot cancel a running task", 409, "CONFLICT");
-      }
-      const taskDb = createTaskDb(getTaskDb());
-      taskDb.updateStatus(req.params.id!, "cancelled");
-      return res.json({ ...task, id: task.taskId, status: "cancelled" });
-    } catch (err) {
-      next(err);
-    }
-  });
+  // ── Payment reconciliation routes ──────────────────────────────────────────
+  app.use("/api/reconciliation", createReconciliationRouter(opts.reconciliation));
 
+  // ── HTTP server ────────────────────────────────────────────────────
   const httpServer = createServer(app);
 
-  const eventStore = opts.eventStore ?? createEventStore();
-  const stopRecording = eventBus.subscribeAll((event) =>
-    eventStore.append(event),
-  );
+  // ── Event persistence ──────────────────────────────────────────────────────
+  // The EventBus already persists every event to its own EventStore (wired in
+  // the EventBus constructor).  We use that same store as the single canonical
+  // source for stream replay so there is exactly one DB and one writer.
+  // opts.eventStore is kept for backward compatibility with tests that inject
+  // a custom store; in production it will always be undefined here.
+  const eventStore = opts.eventStore ?? eventBus.store;
 
   const detachStream = attachTaskStream({
     httpServer,
@@ -189,26 +231,57 @@ export function createApp(opts: AppOptions = {}): {
     ...opts.stream,
   });
 
+  // ── Metrics ────────────────────────────────────────────────────────────────
+  // GC is process-global, so the observer is started once and left running for
+  // the lifetime of the process (it is unref'd and never holds the event loop
+  // open). The WebSocket probe is per-app and is cleared on close().
+  metricsService.startGcObserver();
+  metricsService.setWebSocketProbe(() => ({
+    listening: httpServer.listening,
+    connections: getStreamConnectionCount(),
+  }));
+
+  // ── Error handler (must be last) ───────────────────────────────────────────
   app.use(errorHandler);
 
-  function close(): void {
+  function close(callback?: () => void): void {
+    jobWorker.stop();
+    heartbeatService.stop();
+    metricsService.setWebSocketProbe(null);
     detachStream();
-    stopRecording();
-    eventStore.close();
-    httpServer.close();
+    if (httpServer.listening) {
+      httpServer.close(callback);
+    } else if (callback) {
+      callback();
+    }
   }
 
   return { httpServer, close };
 }
 
-async function defaultDispatch(
-  taskId: string,
-  node: { nodeId: string; agentType: string; prompt: string },
-  context: string,
-): Promise<unknown> {
-  throw new AppError(
-    `No agent registered for type: ${node.agentType}`,
-    500,
-    "AGENT_NOT_FOUND",
-  );
+/**
+ * Build a DispatchFn that looks up the cheapest agent for a node's type in the
+ * provided registry and forwards the call to that agent via HTTP.
+ *
+ * If no registry is provided (e.g. during tests that supply their own dispatch)
+ * the returned function throws a clear error so misconfiguration is obvious at
+ * runtime rather than producing a silent no-op.
+ */
+function makeHttpDispatch(registry?: AgentRegistry): DispatchFn {
+  return async (taskId: string, node: DAGNode, context: string): Promise<unknown> => {
+    if (!registry) {
+      throw new Error(
+        `No agent registry configured. Provide agentRegistry in AppOptions or supply a custom dispatch function.`,
+      );
+    }
+
+    const agents = await registry.getAgents(node.type);
+    if (!agents || agents.length === 0) {
+      throw new AppError(`No agent registered for type: ${node.type}`, 500, "AGENT_NOT_FOUND");
+    }
+
+    // Pick cheapest available agent.
+    const agent = [...agents].sort((a, b) => a.cost - b.cost)[0];
+    return httpDispatch(agent, node.nodeId, node, context);
+  };
 }

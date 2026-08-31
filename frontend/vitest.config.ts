@@ -12,6 +12,8 @@ export default defineConfig({
       '@services': path.resolve(__dirname, './src/services'),
       '@types': path.resolve(__dirname, './src/types'),
       '@context': path.resolve(__dirname, './src/context'),
+      '@utils': path.resolve(__dirname, './src/utils'),
+      'framer-motion': path.resolve(__dirname, 'node_modules/framer-motion/dist/cjs/index.js'),
     },
   },
   test: {

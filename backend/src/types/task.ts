@@ -5,18 +5,27 @@
  * Do NOT re-define TaskStatus, NodeStatus, or DAGEventType elsewhere.
  */
 
+import type { QualityScore } from "../services/qualityScorer.types";
+
 export type TaskStatus = "queued" | "running" | "completed" | "cancelled" | "failed";
 
 /** Node-level statuses used by the coordinator during DAG execution. */
 export type NodeStatus = "pending" | "running" | "completed" | "failed";
 
-export interface DagNode {
-  id: string;
-  agentType: string;
-  description: string;
-  status: TaskStatus;
-  result?: string;
+export interface DAGNode {
+  nodeId: string;
+  type: string;
   dependencies: string[];
+  status: NodeStatus;
+  result?: any;
+  error?: string;
+  prompt?: string;
+  description?: string;
+  /**
+   * Quality scoring result attached after agent execution, persisted with the
+   * node's task execution record. Absent when scoring is disabled or fails.
+   */
+  quality?: QualityScore;
 }
 
 export interface Task {
@@ -24,9 +33,10 @@ export interface Task {
   prompt: string;
   walletPublicKey: string;
   status: TaskStatus;
-  dagJson: string; // JSON-serialised DagNode[]
+  dag: DAGNode[];
   createdAt: string;
   updatedAt: string;
+  requestId?: string;
 }
 
 /** Events emitted by the coordinator */
@@ -37,7 +47,10 @@ export type DAGEventType =
   | "payment_locked"
   | "payment_released"
   | "task_completed"
-  | "task_failed";
+  | "task_failed"
+  | "AgentFailedOver"
+  | "AgentRecovered"
+  | "AgentMarkedOffline";
 
 export interface DAGEvent {
   type: DAGEventType;

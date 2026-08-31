@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { VeniceClient } from '../../venice/index.js';
+import { VeniceClient, type VeniceClientLike } from '../../services/venice/index.js';
 import type { AgentTask, AgentResult, AgentError, Source } from './types';
 
 const SourceSchema = z.object({
@@ -15,6 +15,20 @@ const VeniceResearchResponseSchema = z.object({
 });
 
 type VeniceResearchResponse = z.infer<typeof VeniceResearchResponseSchema>;
+
+/**
+ * Canonical output shape returned by `execute()` and consumed by the
+ * Coordinator. Exported for the quality scorer, which validates agent output
+ * against this schema in its format dimension.
+ */
+export const ResearchOutputSchema = z.object({
+  taskId: z.string(),
+  nodeId: z.string(),
+  summary: z.string().min(1),
+  keyFindings: z.array(z.string().min(1)).min(1),
+  sources: z.array(SourceSchema),
+  confidence: z.number().min(0).max(1),
+});
 
 export function deriveConfidence(sourceCount: number): number {
   if (sourceCount === 0) return 0.3;
@@ -47,13 +61,13 @@ no explanation, no markdown, no code blocks:
 }`;
 
 export interface ResearchAgentConfig {
-  veniceClient?: VeniceClient;
+  veniceClient?: VeniceClientLike;
   apiBaseUrl?: string;
   agentId?: string;
 }
 
 export class ResearchAgent {
-  private readonly venice: VeniceClient;
+  private readonly venice: VeniceClientLike;
   private readonly apiBaseUrl: string;
   private readonly agentId: string;
 

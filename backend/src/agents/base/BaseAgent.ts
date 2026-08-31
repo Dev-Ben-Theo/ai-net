@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { VeniceClient, type AgentType } from '../../venice/index.js';
+import { VeniceClient, type AgentType, type VeniceClientLike } from '../../venice/index.js';
+import { HeartbeatClient } from '../heartbeat.js';
 
 export interface BaseAgentConfig {
-  veniceClient?: VeniceClient;
+  veniceClient?: VeniceClientLike;
   apiBaseUrl?: string;
   agentId?: string;
 }
@@ -20,9 +21,10 @@ export interface AgentError {
 }
 
 export abstract class BaseAgent {
-  protected readonly venice: VeniceClient;
+  protected readonly venice: VeniceClientLike;
   protected readonly apiBaseUrl: string;
   protected readonly agentId: string;
+  private readonly heartbeatClient: HeartbeatClient | null = null;
 
   constructor(config: BaseAgentConfig = {}) {
     if (config.veniceClient) {
@@ -39,6 +41,13 @@ export abstract class BaseAgent {
     }
     this.apiBaseUrl = config.apiBaseUrl ?? 'http://127.0.0.1:3001';
     this.agentId = config.agentId ?? `${this.getCapability()}-agent-1`;
+
+    if (config.apiBaseUrl) {
+      this.heartbeatClient = new HeartbeatClient({
+        apiBaseUrl: this.apiBaseUrl,
+        agentId: this.agentId,
+      });
+    }
   }
 
   abstract execute(task: AgentTask): Promise<unknown | AgentError>;
@@ -83,6 +92,14 @@ export abstract class BaseAgent {
     } catch (err) {
       console.warn(`[${this.constructor.name}] Could not reach registry to self-register:`, err instanceof Error ? err.message : 'unknown');
     }
+  }
+
+  startHeartbeat(): void {
+    this.heartbeatClient?.start();
+  }
+
+  stopHeartbeat(): void {
+    this.heartbeatClient?.stop();
   }
 
   protected validateOutput(raw: unknown): unknown | null {

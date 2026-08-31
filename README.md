@@ -113,21 +113,91 @@ ai-net/
 
 ## Getting Started
 
-### Prerequisites
+### Quick Start (Docker Compose — Recommended)
 
-- Node.js >= 18
+Run the entire stack (Local Stellar Standalone + Backend API + Frontend) with one command:
+
+```bash
+# 1. Clone & copy environment defaults
+git clone https://github.com/Epta-Node/ai-net.git
+cd ai-net
+
+# 2. Start all services via Docker Compose
+docker compose up -d
+
+# 3. Access interfaces:
+# - Frontend: http://localhost:5173
+# - Backend API: http://localhost:3000 (Health: http://localhost:3000/health)
+# - Stellar Standalone RPC: http://localhost:8000/soroban/rpc
+```
+
+---
+
+### Manual / Local Prerequisites
+
+- Node.js >= 20
+- Docker & Docker Compose
 - A Stellar testnet account ([create one](https://laboratory.stellar.org/#account-creator))
 - Venice AI API key ([get one](https://venice.ai))
 
-### Install
+### Manual Install
 
 ```bash
-git clone https://github.com/YOUR_ORG/ai-net.git
+git clone https://github.com/Epta-Node/ai-net.git
 cd ai-net
 npm install
 cp .env.example .env
 # Fill in your Stellar keypair and Venice AI key
 ```
+
+For a full day-one setup guide covering local development, testnet funding, Docker-backed Stellar nodes, and CI expectations, see [docs/DEVELOPER_SETUP.md](docs/DEVELOPER_SETUP.md).
+
+### Smart Contract Deployment
+
+Deploy contracts to testnet:
+
+```bash
+cd smart-contracts
+cp .env.example .env
+# Fill in STELLAR_SECRET_KEY and VENICE_API_KEY
+
+# Deploy all contracts
+./scripts/deploy.sh --network testnet
+
+# Verify deployment
+./scripts/verify.sh --network testnet
+```
+
+### Smart Contract Upgrades
+
+Upgrade deployed contracts:
+
+```bash
+cd smart-contracts
+
+# Dry run to see what would be upgraded
+./scripts/upgrade.sh --network testnet --dry-run
+
+# Upgrade specific contract using upgrade manager (recommended)
+./scripts/upgrade.sh --network testnet --use-upgrade-manager agent-registry
+
+# Upgrade to specific version
+./scripts/upgrade.sh --network testnet --use-upgrade-manager --version "1.2.0" agent-registry
+
+# Upgrade all contracts
+./scripts/upgrade.sh --network testnet --use-upgrade-manager
+```
+
+The upgrade system provides:
+- ✅ **Safe upgrades** with pre/post migration hooks
+- ✅ **Version compatibility** checking 
+- ✅ **48-hour rollback** window for emergency recovery
+- ✅ **Gas estimation** for migration operations
+- ✅ **Event tracking** for upgrade monitoring
+
+For detailed upgrade procedures and troubleshooting, see [UPGRADE_GUIDE.md](smart-contracts/docs/UPGRADE_GUIDE.md).
+
+For storage migration guidance, see [STORAGE_MIGRATION.md](smart-contracts/docs/STORAGE_MIGRATION.md).
 
 ### Database migration
 This branch does not include an automated migration runner. To apply the backend index migration, run the SQL script directly against your PostgreSQL database:
@@ -171,11 +241,25 @@ npm run test:e2e
 
 ---
 
+## Documentation
+
+- [Architecture Specification](docs/architecture/index.md): System context, component architecture, Mermaid sequence diagrams, and security model.
+- [REST API Reference](docs/API_REFERENCE.md): Comprehensive per-endpoint documentation, error codes taxonomy, authentication headers, and runnable curl examples.
+- [Node Operators Guide](docs/NODE_OPERATORS_GUIDE.md): Step-by-step instructions for provisioning, configuring secrets, deploying smart contracts, funding accounts, operating nodes, monitoring metrics, and troubleshooting common errors.
+- [Smart Contract Deployment Guide](smart-contracts/docs/DEPLOYMENT_GUIDE.md): Complete deployment and upgrade workflows on Soroban.
+- [Task Store Lifecycle Events](smart-contracts/docs/TASK_STORE_EVENTS.md): Versioned on-chain event schema for task creation, updates, and finalization.
+- [End-to-End Testing Guide](docs/e2e-testing.md): Automated test execution and validation.
+- [Release Engineering Guide](docs/RELEASE_ENGINEERING.md): Tagging, changelog generation, artifact signing, and release checklists.
+- [Frontend Architecture & Conventions](docs/FRONTEND_ARCHITECTURE.md): Folder structure, naming rules, state management, and component patterns.
+
+---
+
 ## Contributing
 
 ai-net is an open-source project and **contributions are welcome at every level** — from fixing typos to building new agent types.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get started.
+- Read our **[CONTRIBUTING.md](CONTRIBUTING.md)** for our SDLC, branching rules, Conventional Commits, and review checklists.
+- For AI agent contributors, see **[AGENTS.md](AGENTS.md)** for architectural standards and code invariants.
 
 Looking for a place to start? Check [ISSUES.md](ISSUES.md) or browse [good first issues](../../issues?q=label%3A%22good+first+issue%22).
 

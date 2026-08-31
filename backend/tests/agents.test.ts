@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from "express";
 import type { AddressInfo } from "net";
 import request from "supertest";
 import { createAgentsRouter } from "../src/api/routes/agents";
+import { createTasksRouter } from "../src/api/routes/tasks";
 import { AgentRecord, createAgentDb } from "../src/db/agents";
 import Database from "better-sqlite3";
 import { AppError } from "../src/errors";
@@ -13,7 +14,8 @@ const codingAgent: AgentRecord = {
   endpoint: "http://127.0.0.1:3001/health",
   stellarPublicKey: "GBXX...",
   reputationScore: 0,
-  lastSeenAt: new Date().toISOString()
+  lastSeenAt: new Date().toISOString(),
+  status: "online"
 };
 
 function testErrorHandler(err: Error, _req: Request, res: Response, _next: NextFunction): void {
@@ -40,7 +42,8 @@ function createTestApp(initialAgents: AgentRecord[] = [], healthTimeoutMs = 500)
       endpoint         TEXT NOT NULL,
       stellarPublicKey TEXT NOT NULL,
       reputationScore  REAL NOT NULL DEFAULT 0,
-      lastSeenAt       TEXT NOT NULL
+      lastSeenAt       TEXT NOT NULL,
+      status           TEXT NOT NULL DEFAULT 'online'
     )
   `);
   const db = createAgentDb(rawDb);
@@ -138,5 +141,134 @@ describe("Agents API route", () => {
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({ error: { code: "NOT_FOUND", message: "Agent not found" } });
+  });
+
+  it("returns 200 and updates lastSeenAt on heartbeat", async () => {
+    const app = createTestApp([codingAgent]);
+    // SQLite's datetime('now') has second precision, so floor the baseline.
+    const before = new Date(Math.floor(Date.now() / 1000) * 1000);
+
+    const response = await request(app).post("/api/agents/coding-1/heartbeat");
+
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe("ok");
+    expect(new Date(response.body.lastSeenAt).getTime()).toBeGreaterThanOrEqual(before.getTime());
+    const updated = await request(app).get("/api/agents/coding-1");
+    expect(new Date(updated.body.lastSeenAt).getTime()).toBeGreaterThanOrEqual(before.getTime());
+    expect(updated.body.status).toBe("online");
+  });
+
+  it("returns 404 when sending heartbeat to an unknown agent", async () => {
+    const response = await request(createTestApp()).post("/api/agents/missing/heartbeat");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: { code: "NOT_FOUND", message: "Agent not found" } });
+  });
+});
+
+describe("Stellar public key validation", () => {
+  const VALID_KEY = "GB3W5IYBKWGAZ277DJEEG5H635MUUGBTFPUTF7R2N5IJYP36AY2H2CUZ";
+
+  beforeAll(() => {
+    process.env.SKIP_STELLAR_ACCOUNT_VERIFY = "true";
+  });
+
+  afterAll(() => {
+    delete process.env.SKIP_STELLAR_ACCOUNT_VERIFY;
+  });
+
+  describe("Agent registration", () => {
+    it("returns 400 for key missing the G prefix", async () => {
+      const response = await request(createTestApp()).post("/api/agents/register").send({
+        agentId: "test-agent",
+        capabilities: ["coding"],
+        pricingXLM: 1,
+        endpoint: "http://localhost:3001/health",
+        stellarPublicKey: "AAXXWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGDG6NXGPTVMLHK4HZ7HHN",
+      });
+
+      expect(response.status).toBe(400);
+    });
+
+    it("returns 400 for key shorter than 56 characters", async () => {
+      const response = await request(createTestApp()).post("/api/agents/register").send({
+        agentId: "test-agent",
+        capabilities: ["coding"],
+        pricingXLM: 1,
+        endpoint: "http://localhost:3001/health",
+        stellarPublicKey: "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCG",
+      });
+
+      expect(response.status).toBe(400);
+    });
+
+    it("returns 400 for negative pricingXLM", async () => {
+      const response = await request(createTestApp()).post("/api/agents/register").send({
+        agentId: "test-agent",
+        capabilities: ["coding"],
+        pricingXLM: -1,
+        endpoint: "http://localhost:3001/health",
+        stellarPublicKey: VALID_KEY,
+      });
+
+      expect(response.status).toBe(400);
+    });
+
+    it("returns 400 for zero pricingXLM", async () => {
+      const response = await request(createTestApp()).post("/api/agents/register").send({
+        agentId: "test-agent",
+        capabilities: ["coding"],
+        pricingXLM: 0,
+        endpoint: "http://localhost:3001/health",
+        stellarPublicKey: VALID_KEY,
+      });
+
+      expect(response.status).toBe(400);
+    });
+
+    it("returns 201 for valid Stellar public key", async () => {
+      const response = await request(createTestApp()).post("/api/agents/register").send({
+        agentId: "test-agent",
+        capabilities: ["coding"],
+        pricingXLM: 1,
+        endpoint: "http://localhost:3001/health",
+        stellarPublicKey: VALID_KEY,
+      });
+
+      expect(response.status).toBe(201);
+      expect(response.body.stellarPublicKey).toBe(VALID_KEY);
+    });
+  });
+
+  describe("Task creation", () => {
+    function createTaskTestApp() {
+      const app = express();
+      app.use(express.json());
+      const mockDispatch = jest.fn().mockResolvedValue({});
+      const mockReleasePayment = jest.fn().mockResolvedValue(undefined);
+      app.use("/api/tasks", createTasksRouter(mockDispatch, mockReleasePayment));
+      return app;
+    }
+
+    it("creates the task with an unvalidated walletpublickey header value", async () => {
+      const response = await request(createTaskTestApp())
+        .post("/api/tasks")
+        .set("walletpublickey", "INVALID-KEY-123")
+        .send({ prompt: "Do something", maxBudgetXLM: 1 });
+
+      expect(response.status).toBe(201);
+      expect(response.body.status).toBe("queued");
+      expect(response.body.taskId).toBeDefined();
+    });
+
+    it("creates the task with an anonymous wallet when the header is missing", async () => {
+      const response = await request(createTaskTestApp())
+        .post("/api/tasks")
+        .send({ prompt: "Do something", maxBudgetXLM: 1 });
+
+      expect(response.status).toBe(201);
+      expect(response.body.status).toBe("queued");
+      expect(response.body.taskId).toBeDefined();
+    });
   });
 });

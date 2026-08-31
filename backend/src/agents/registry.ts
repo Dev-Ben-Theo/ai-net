@@ -1,7 +1,10 @@
 /**
  * Agent startup and registration manager.
- * 
+ *
  * Instantiates all agents and handles their self-registration on startup.
+ * This class is distinct from the {@link AgentRegistry} interface in
+ * `types/agent.ts`, which is the look-up interface used by the coordinator
+ * to resolve agents by type.
  */
 
 import { ResearchAgent } from './research/research';
@@ -13,9 +16,10 @@ import { ReportAgent } from './report';
 export interface AgentRegistryConfig {
   apiBaseUrl?: string;
   autoRegister?: boolean;
+
 }
 
-export class AgentRegistry {
+export class AgentStartupRegistry {
   private readonly agents: Array<{
     instance: any;
     capability: string;
@@ -51,6 +55,7 @@ export class AgentRegistry {
       const registrations = this.agents.map(async ({ instance, capability }) => {
         try {
           await instance.register();
+          instance.startHeartbeat();
         } catch (error) {
           console.error(`[AgentRegistry] Failed to register ${capability} agent:`, error instanceof Error ? error.message : 'unknown');
         }
@@ -58,6 +63,19 @@ export class AgentRegistry {
 
       await Promise.all(registrations);
       console.log(`[AgentRegistry] Registration complete. ${this.agents.length} agents initialized.`);
+    }
+  }
+
+  /**
+   * Stop heartbeats for all agents.
+   */
+  async shutdown(): Promise<void> {
+    for (const { instance } of this.agents) {
+      try {
+        instance.stopHeartbeat();
+      } catch {
+        // ignore shutdown errors
+      }
     }
   }
 
@@ -104,12 +122,12 @@ export class AgentRegistry {
 }
 
 // Default singleton instance for easy usage
-export const globalAgentRegistry = new AgentRegistry();
+export const globalAgentRegistry = new AgentStartupRegistry();
 
 /**
  * Initialize all agents - call this on app startup.
  */
 export async function initializeAgents(config?: AgentRegistryConfig): Promise<void> {
-  const registry = config ? new AgentRegistry(config) : globalAgentRegistry;
+  const registry = config ? new AgentStartupRegistry(config) : globalAgentRegistry;
   await registry.initialize();
 }

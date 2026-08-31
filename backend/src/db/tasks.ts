@@ -1,6 +1,10 @@
 import Database from "better-sqlite3";
 import path from "path";
 import type { Task, TaskStatus } from "../types/task";
+import type { QualityScoreRecord } from "../services/qualityScorer.types";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger({ component: "task-db" });
 
 let _taskDb: Database.Database | null = null;
 
@@ -8,6 +12,15 @@ export function getTaskDb(dbPath?: string): Database.Database {
   if (!_taskDb) {
     const filePath = dbPath ?? path.join(process.cwd(), "tasks.db");
     _taskDb = new Database(filePath);
+    _taskDb.pragma("busy_timeout = 5000");
+    _taskDb.pragma("journal_mode = WAL");
+    try {
+      (_taskDb as any).on("error", (err: Error) => {
+        logger.error({ err }, "task database error");
+      });
+    } catch {
+      // error events are emitted from node EventEmitter support in runtime
+    }
     _taskDb.exec(`
       CREATE TABLE IF NOT EXISTS tasks (
         id              TEXT PRIMARY KEY,
@@ -27,6 +40,20 @@ export function getTaskDb(dbPath?: string): Database.Database {
         timestamp TEXT    NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_task_events_taskId ON task_events (taskId);
+      CREATE TABLE IF NOT EXISTS quality_scores (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        taskId       TEXT    NOT NULL,
+        nodeId       TEXT    NOT NULL,
+        agentId      TEXT,
+        agentType    TEXT    NOT NULL,
+        score        REAL    NOT NULL,
+        completeness REAL    NOT NULL,
+        relevance    REAL    NOT NULL,
+        format       REAL    NOT NULL,
+        needsReview  INTEGER NOT NULL DEFAULT 0,
+        timestamp    TEXT    NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_quality_scores_agentId ON quality_scores (agentId);
     `);
   }
   return _taskDb;
@@ -49,6 +76,8 @@ export interface TaskListOptions {
   status?: string;
   q?: string;
   sort?: "createdAt:asc" | "createdAt:desc";
+  /** ISO timestamp — only return tasks created after this point. */
+  createdAfter?: string;
 }
 
 export interface TaskDb {
@@ -64,6 +93,9 @@ export interface TaskDb {
   updateDagJson(id: string, dagJson: string): void;
   insertEvent(event: TaskEvent): void;
   getEventHistory(taskId: string): TaskEvent[];
+  failRunningTasks(): void;
+  insertQualityScore(record: QualityScoreRecord): void;
+  listQualityScores(agentId?: string, limit?: number): QualityScoreRecord[];
 }
 
 export function createTaskDb(db: Database.Database): TaskDb {
@@ -74,12 +106,19 @@ export function createTaskDb(db: Database.Database): TaskDb {
         INSERT INTO tasks (id, prompt, walletPublicKey, status, dagJson, createdAt, updatedAt)
         VALUES (@id, @prompt, @walletPublicKey, @status, @dagJson, @createdAt, @updatedAt)
       `,
-      ).run(task);
+      ).run({
+        ...task,
+        dagJson: JSON.stringify(task.dag),
+      });
     },
 
     findById(id: string): Task | undefined {
-      return db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as
-        Task | undefined;
+      const row = db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as any;
+      if (!row) return undefined;
+      return {
+        ...row,
+        dag: JSON.parse(row.dagJson),
+      };
     },
 
     list(
@@ -102,16 +141,26 @@ export function createTaskDb(db: Database.Database): TaskDb {
         params.push(`%${options.q}%`);
       }
 
+      if (options.createdAfter) {
+        conditions.push("createdAt > ?");
+        params.push(options.createdAfter);
+      }
+
       const whereClause = conditions.join(" AND ");
 
       // Only allow safe sort values — default to DESC
       const sortOrder = options.sort === "createdAt:asc" ? "ASC" : "DESC";
 
-      const tasks = db
+      const rows = db
         .prepare(
           `SELECT * FROM tasks WHERE ${whereClause} ORDER BY createdAt ${sortOrder} LIMIT ? OFFSET ?`,
         )
-        .all(...params, pageSize, offset) as Task[];
+        .all(...params, pageSize, offset) as any[];
+
+      const tasks: Task[] = rows.map((row) => ({
+        ...row,
+        dag: JSON.parse(row.dagJson),
+      }));
 
       const { total } = db
         .prepare(`SELECT COUNT(*) as total FROM tasks WHERE ${whereClause}`)
@@ -165,6 +214,88 @@ export function createTaskDb(db: Database.Database): TaskDb {
         type: r.type,
         nodeId: r.nodeId ?? undefined,
         payload: r.payload ? JSON.parse(r.payload) : undefined,
+        timestamp: r.timestamp,
+      }));
+    },
+
+    failRunningTasks(): void {
+      const now = new Date().toISOString();
+      const runningTasks = db.prepare("SELECT * FROM tasks WHERE status = 'running'").all() as any[];
+      for (const task of runningTasks) {
+        let dag: any[] = [];
+        try {
+          dag = JSON.parse(task.dagJson);
+          for (const node of dag) {
+            if (node.status === 'running' || node.status === 'pending') {
+              node.status = 'failed';
+              node.error = 'Server shutdown';
+            }
+          }
+        } catch (e) {
+          // ignore parse error
+        }
+        db.prepare("UPDATE tasks SET status = 'failed', dagJson = ?, updatedAt = ? WHERE id = ?").run(
+          JSON.stringify(dag),
+          now,
+          task.id
+        );
+      }
+    },
+
+    insertQualityScore(record: QualityScoreRecord): void {
+      db.prepare(
+        `
+        INSERT INTO quality_scores (taskId, nodeId, agentId, agentType, score, completeness, relevance, format, needsReview, timestamp)
+        VALUES (@taskId, @nodeId, @agentId, @agentType, @score, @completeness, @relevance, @format, @needsReview, @timestamp)
+      `,
+      ).run({
+        taskId: record.taskId,
+        nodeId: record.nodeId,
+        agentId: record.agentId ?? null,
+        agentType: record.agentType,
+        score: record.score,
+        completeness: record.completeness,
+        relevance: record.relevance,
+        format: record.format,
+        needsReview: record.needsReview ? 1 : 0,
+        timestamp: record.timestamp,
+      });
+    },
+
+    listQualityScores(agentId?: string, limit: number = 500): QualityScoreRecord[] {
+      const rows = (
+        agentId
+          ? db
+              .prepare(
+                "SELECT * FROM quality_scores WHERE agentId = ? ORDER BY id ASC LIMIT ?",
+              )
+              .all(agentId, limit)
+          : db
+              .prepare("SELECT * FROM quality_scores ORDER BY id ASC LIMIT ?")
+              .all(limit)
+      ) as Array<{
+        taskId: string;
+        nodeId: string;
+        agentId: string | null;
+        agentType: string;
+        score: number;
+        completeness: number;
+        relevance: number;
+        format: number;
+        needsReview: number;
+        timestamp: string;
+      }>;
+
+      return rows.map((r) => ({
+        taskId: r.taskId,
+        nodeId: r.nodeId,
+        agentId: r.agentId ?? undefined,
+        agentType: r.agentType,
+        score: r.score,
+        completeness: r.completeness,
+        relevance: r.relevance,
+        format: r.format,
+        needsReview: r.needsReview === 1,
         timestamp: r.timestamp,
       }));
     },
