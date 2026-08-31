@@ -26,6 +26,7 @@ import {
   getStreamConnectionCount,
   type TaskStreamOptions,
 } from "./routes/stream";
+import { metricsMiddleware, metricsService } from "../services/metrics";
 import type { DAGNode } from "../types/task";
 import {
   createPaymentReleaseFn,
